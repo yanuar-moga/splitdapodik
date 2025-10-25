@@ -96,10 +96,10 @@ document.getElementById('file-input').addEventListener('change', (evt) => {
       const workbook = XLSX.read(data, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      // read as array of objects (header row must be first row)
-      const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      // IMPORTANT: start reading from row-5 (skip 4 rows) so header is at row 5
+      const json = XLSX.utils.sheet_to_json(worksheet, { defval: '', range: 4 });
       if (!json || json.length === 0) {
-        alert('Sheet kosong atau tidak terbaca.');
+        alert('Sheet kosong atau tidak terbaca. Pastikan header tabel berada pada baris ke-5.');
         showLoading(false);
         return;
       }
@@ -250,7 +250,6 @@ document.getElementById('download-rombel-btn').addEventListener('click', () => {
     generateGrouped('Rombel');
     return;
   }
-  // fallback: if no processed data but selection exists attempt to filter mappedRows
   const arr = (mappedRows && mappedRows.length) ? mappedRows.filter(r => (r.Rombel||'').toString().trim() === rombelSel) : [];
   if (arr.length) downloadFromRows(arr, `rombel_${sanitizeFilename(rombelSel)}.xlsx`);
   else alert('Tidak ada data untuk rombel terpilih. Lakukan PROSES terlebih dahulu.');
@@ -287,35 +286,4 @@ function downloadFromRows(rows, filename) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(wsData);
   XLSX.utils.book_append_sheet(wb, ws, 'Data');
-  XLSX.writeFile(wb, filename);
-}
-
-function generateGrouped(field) {
-  if (!mappedRows || mappedRows.length === 0) { alert('Belum ada data ter-proses. Klik PROSES dulu.'); return; }
-  const groups = {};
-  mappedRows.forEach(r => {
-    const k = (r[field]||'').toString().trim() || '(kosong)';
-    if (!groups[k]) groups[k] = [];
-    groups[k].push(r);
-  });
-  for (const [k, arr] of Object.entries(groups)) {
-    const fname = `${field.toLowerCase()}_${sanitizeFilename(k)}.xlsx`;
-    downloadFromRows(arr, fname);
-  }
-  alert(`Selesai generate ${Object.keys(groups).length} file (satu per ${field}).`);
-}
-
-function sanitizeFilename(s) {
-  return s.replace(/[\/\\?%*:|"<>]/g, '_').replace(/\s+/g,'_').slice(0,120);
-}
-
-// Loading indicator
-function showLoading(flag) {
-  const st = document.getElementById('load-status');
-  if (flag) st.classList.remove('hidden'); else st.classList.add('hidden');
-}
-
-// initial
-(function init(){
-  resetApp();
-})();
+  XLSX.writeFile(wb, filen
