@@ -24,59 +24,62 @@
     <header class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-semibold">Dapodik Mapper — SMPN 1 Moga</h1>
-        <p class="text-sm text-slate-600">Upload Excel → pilih Rombel → klik <strong>PROSES</strong> → tampil & download per rombel/kelas</p>
+        <p class="text-sm text-slate-600">Upload Dapodik (.xlsx) → pilih Rombel → klik <strong>PROSES</strong> → tampil → tambah filter → Terapkan Filter → download.</p>
       </div>
       <div class="text-sm text-slate-500">Client-side · SheetJS + DataTables</div>
     </header>
 
+    <!-- Upload & Rombel -->
     <div class="card mb-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium mb-1">Upload file Excel (.xlsx)</label>
           <input id="file-input" type="file" accept=".xlsx, .xls" class="w-full border rounded px-3 py-2 bg-white"/>
-          <p class="mt-2 text-xs text-slate-500">Kolom rombel acuan: <code>Rombel Saat Ini_Unnamed: 42_level_1</code> (biasanya AQ). Script sudah dikonfigurasi untuk membaca mulai baris 5.</p>
+          <p class="mt-2 text-xs text-slate-500">Script skip 4 baris awal; header tabel di baris ke-5.</p>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">Pilih kolom Rombel (deteksi otomatis)</label>
-          <select id="rombel-col-select" class="w-full border rounded px-3 py-2 bg-white"></select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Pilih kolom Kelas (deteksi otomatis)</label>
-          <select id="kelas-col-select" class="w-full border rounded px-3 py-2 bg-white"></select>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium mb-1">Pilih Rombel (akan terisi otomatis setelah upload)</label>
+          <div class="flex gap-2">
+            <select id="filter-rombel" class="flex-1 border rounded px-3 py-2 bg-white"></select>
+            <button id="process-btn" class="px-4 py-2 rounded bg-sky-600 text-white shadow">PROSES</button>
+            <button id="reset-btn" class="px-4 py-2 rounded border bg-white text-slate-700">Reset</button>
+          </div>
         </div>
       </div>
 
-      <div class="mt-4 flex gap-3 items-center">
-        <button id="process-btn" class="px-4 py-2 rounded bg-sky-600 text-white shadow">PROSES</button>
-        <button id="reset-btn" class="px-4 py-2 rounded border bg-white text-slate-700">Reset</button>
+      <div id="load-status" class="mt-3 text-sm text-slate-500 hidden">Memuat file... <span id="load-spinner">⏳</span></div>
+    </div>
 
-        <div id="load-status" class="ml-auto text-sm text-slate-500 hidden">
-          Memuat file... <span id="load-spinner" class="inline-block animate-spin">⏳</span>
+    <!-- Filter toolbar -->
+    <div class="card mb-6">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="text-sm text-slate-600">Filter Lanjutan (Tambah beberapa filter, lalu klik <strong>Terapkan Filter</strong>):</div>
+        <div class="ml-auto flex gap-2">
+          <button id="add-filter-btn" class="px-3 py-1 rounded bg-white border">+ Tambah Filter</button>
+          <button id="apply-filters-btn" class="px-3 py-1 rounded bg-amber-600 text-white">Terapkan Filter</button>
+          <button id="clear-filters-btn" class="px-3 py-1 rounded border bg-white">Bersihkan</button>
         </div>
+      </div>
+
+      <div id="filters-container" class="space-y-2">
+        <!-- filter rows will be injected here -->
+      </div>
+
+      <div class="mt-2 text-xs text-slate-500">
+        Catatan: filter bersifat **case-insensitive contains** (kecuali Anda ingin exact-match; sebutkan nanti).
       </div>
     </div>
 
+    <!-- Table & actions -->
     <div class="card mb-6">
       <div class="flex items-center gap-4 mb-4">
-        <div>
-          <label class="block text-sm">Filter Rombel</label>
-          <select id="filter-rombel" class="border rounded px-3 py-2 w-64"></select>
-        </div>
-
-        <div>
-          <label class="block text-sm">Filter Kelas</label>
-          <select id="filter-kelas" class="border rounded px-3 py-2 w-48"></select>
-        </div>
-
+        <div class="text-sm text-slate-600">Status: <span id="notice-text">Belum ada file di-upload.</span></div>
         <div class="ml-auto flex gap-2">
-          <button id="download-rombel-btn" class="px-4 py-2 rounded bg-blue-600 text-white">Download per Rombel</button>
-          <button id="download-kelas-btn" class="px-4 py-2 rounded bg-green-600 text-white">Download per Kelas</button>
+          <button id="download-rombel-btn" class="px-4 py-2 rounded bg-blue-600 text-white">Download per Rombel (terpilih)</button>
+          <button id="download-filtered-btn" class="px-4 py-2 rounded bg-emerald-600 text-white">Download Hasil Filter</button>
         </div>
       </div>
-
-      <div id="notice" class="mb-3 text-sm text-slate-600">Status: <span id="notice-text">Belum ada file di-upload.</span></div>
 
       <div class="dt-container">
         <table id="students-table" class="display stripe hover" style="width:100%">
@@ -89,7 +92,7 @@
     </div>
 
     <footer class="text-sm text-slate-500 text-center mt-6">
-      Didesain untuk penggunaan offline/cloud di browser. Jika butuh fitur simpan session, saya tambahkan IndexedDB/localStorage.
+      Bila ingin perubahan perilaku filter (exact, numeric range, tanggal), beri tahu saya dan saya tambahkan.
     </footer>
   </div>
 
