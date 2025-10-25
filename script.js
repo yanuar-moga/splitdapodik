@@ -1,8 +1,9 @@
-// script.js
-// Dapodik Mapper - client-side
-// Requirements: xlsx.full.min.js, jQuery, DataTables
+// script.js - Dapodik Mapper (PROSES manual)
+// Dependensi: xlsx.full.min.js, jQuery, DataTables
 
-let rawData = []; // array of objects from sheet
+let originalRows = [];   // raw rows read from sheet (objects)
+let mappedRows = [];     // mapped to our fields (Nama, NIS_NISN, ...)
+let currentDisplayed = []; // last output after PROSES (filtered)
 let currentTable = null;
 let detectedHeaders = [];
 
@@ -16,27 +17,22 @@ const requiredKeys = [
   { key: 'alamat', keywords: ['alamat', 'alamat lengkap'] },
 ];
 
-// helpers
 function normalizeHeader(h) {
   return String(h || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function findHeaderByKeywords(headers, keywords) {
-  keywords = keywords.map(k => k.toLowerCase());
-  // 1) exact match attempts
-  for (let k of keywords) {
-    for (let h of headers) {
-      if (normalizeHeader(h) === k) return h;
-    }
+  const kws = keywords.map(k => k.toLowerCase());
+  // exact
+  for (let k of kws) {
+    for (let h of headers) if (normalizeHeader(h) === k) return h;
   }
-  // 2) contains match
-  for (let k of keywords) {
-    for (let h of headers) {
-      if (normalizeHeader(h).includes(k)) return h;
-    }
+  // contains
+  for (let k of kws) {
+    for (let h of headers) if (normalizeHeader(h).includes(k)) return h;
   }
-  // 3) fuzzy: allow removing punctuation
-  for (let k of keywords) {
+  // fuzzy (remove punctuation)
+  for (let k of kws) {
     for (let h of headers) {
       if (normalizeHeader(h).replace(/[^a-z0-9]/g,'').includes(k.replace(/[^a-z0-9]/g,''))) return h;
     }
@@ -61,27 +57,22 @@ function populateSelect(selectEl, options, includeAll = true) {
 }
 
 function resetApp() {
-  rawData = [];
+  originalRows = [];
+  mappedRows = [];
+  currentDisplayed = [];
   detectedHeaders = [];
-  if (currentTable) {
-    currentTable.destroy();
-    currentTable = null;
-  }
-  document.getElementById('rombel-col-select').innerHTML = '';
-  document.getElementById('kelas-col-select').innerHTML = '';
-  document.getElementById('filter-rombel').innerHTML = '';
-  document.getElementById('filter-kelas').innerHTML = '';
+  if (currentTable) { currentTable.destroy(); currentTable = null; }
+  document.getElementById('rombel-col-select').innerHTML = '<option>(belum ada file)</option>';
+  document.getElementById('kelas-col-select').innerHTML = '<option>(belum ada file)</option>';
+  document.getElementById('filter-rombel').innerHTML = '<option>(belum ada file)</option>';
+  document.getElementById('filter-kelas').innerHTML = '<option>(belum ada file)</option>';
   document.getElementById('table-head-row').innerHTML = '';
   document.getElementById('table-body').innerHTML = '';
+  document.getElementById('notice-text').textContent = 'Belum ada file di-upload.';
 }
 
 function initDataTable() {
-  // destroy if exists
-  if (currentTable) {
-    currentTable.destroy();
-    currentTable = null;
-  }
-  // initialize DataTable
+  if (currentTable) { currentTable.destroy(); currentTable = null; }
   currentTable = $('#students-table').DataTable({
     paging: true,
     searching: true,
@@ -89,50 +80,57 @@ function initDataTable() {
     ordering: true,
     autoWidth: false,
     columnDefs: [{ targets: '_all', className: 'dt-left' }],
-    // keep existing DOM table data
+    destroy: true
   });
 }
 
-// read file
+// file input handling
 document.getElementById('file-input').addEventListener('change', (evt) => {
   const f = evt.target.files[0];
   if (!f) return;
+  showLoading(true);
   const reader = new FileReader();
   reader.onload = (e) => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-    if (!json || json.length === 0) {
-      alert('Sheet kosong atau tidak terbaca.');
-      return;
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      // read as array of objects (header row must be first row)
+      const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      if (!json || json.length === 0) {
+        alert('Sheet kosong atau tidak terbaca.');
+        showLoading(false);
+        return;
+      }
+      originalRows = json.slice(); // keep original
+      detectedHeaders = Object.keys(json[0]);
+      buildHeaderSelectors(detectedHeaders);
+      document.getElementById('notice-text').textContent = `File ter-load (${json.length} baris). Pilih rombel/kelas → klik PROSES.`;
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membaca file: ' + err.message);
+    } finally {
+      showLoading(false);
     }
-    rawData = json;
-    detectedHeaders = Object.keys(json[0]);
-    buildHeaderSelectors(detectedHeaders);
-    processAndRender();
   };
   reader.readAsArrayBuffer(f);
 });
 
 function buildHeaderSelectors(headers) {
-  // fill rombel select choices with headers (for manual override)
   const rombelSelect = document.getElementById('rombel-col-select');
   const kelasSelect = document.getElementById('kelas-col-select');
   rombelSelect.innerHTML = '';
   kelasSelect.innerHTML = '';
 
   headers.forEach(h => {
-    const o1 = document.createElement('option');
-    o1.value = h; o1.textContent = h;
+    const o1 = document.createElement('option'); o1.value = h; o1.textContent = h;
     rombelSelect.appendChild(o1);
-    const o2 = document.createElement('option');
-    o2.value = h; o2.textContent = h;
+    const o2 = document.createElement('option'); o2.value = h; o2.textContent = h;
     kelasSelect.appendChild(o2);
   });
 
-  // auto-select detected best candidates
+  // auto-select best candidate
   requiredKeys.forEach(req => {
     if (req.key === 'rombel') {
       const found = findHeaderByKeywords(headers, req.keywords);
@@ -145,32 +143,28 @@ function buildHeaderSelectors(headers) {
   });
 }
 
-document.getElementById('rombel-col-select').addEventListener('change', processAndRender);
-document.getElementById('kelas-col-select').addEventListener('change', processAndRender);
-document.getElementById('reset-btn').addEventListener('click', resetApp);
-
-function mapRowToModel(row, headerMap) {
+// map a row using header map
+function mapRow(row, headerMap) {
   return {
     Nama: row[headerMap.name] || '',
-    NIS_NISN: row[headerMap.nis] || '',
-    Jenis_Kelamin: row[headerMap.gender] || '',
+    'NIS / NISN': row[headerMap.nis] || '',
+    'Jenis Kelamin': row[headerMap.gender] || '',
     Rombel: row[headerMap.rombel] || '',
     Kelas: row[headerMap.kelas] || '',
-    Tanggal_Lahir: row[headerMap.birth] || '',
+    'Tanggal Lahir': row[headerMap.birth] || '',
     Alamat: row[headerMap.alamat] || '',
-    // include raw for export if needed
     _raw: row
   };
 }
 
-function processAndRender() {
-  if (!rawData || rawData.length === 0) return;
+// PROCESS button: map rows and apply filter selections, then render table
+document.getElementById('process-btn').addEventListener('click', () => {
+  if (!originalRows || originalRows.length === 0) { alert('Belum ada file. Silakan upload Excel dulu.'); return; }
 
+  // build header map (respect manual selects)
   const headers = detectedHeaders.slice();
-  // determine header mapping
   const headerMap = {};
   requiredKeys.forEach(req => {
-    // if user selected manual override for rombel/kelas
     if (req.key === 'rombel') {
       const sel = document.getElementById('rombel-col-select').value;
       headerMap.rombel = sel || findHeaderByKeywords(headers, req.keywords);
@@ -181,36 +175,37 @@ function processAndRender() {
       headerMap.kelas = sel || findHeaderByKeywords(headers, req.keywords);
       return;
     }
-    const found = findHeaderByKeywords(headers, req.keywords);
-    headerMap[req.key] = found;
+    headerMap[req.key] = findHeaderByKeywords(headers, req.keywords);
   });
 
-  // check required mapped minimal columns
-  if (!headerMap.name || !headerMap.rombel) {
-    // still allow but warn
-    console.warn('Kolom Nama atau Rombel tidak terdeteksi otomatis. Silakan pilih manual di dropdown.');
-    // continue
-  }
-
-  // map all rows
-  const mapped = rawData.map(r => mapRowToModel(r, headerMap));
-  // store
-  rawData = mapped;
+  // map all originalRows
+  mappedRows = originalRows.map(r => mapRow(r, headerMap));
 
   // build rombel & kelas lists
-  const rombels = Array.from(new Set(mapped.map(r => (r.Rombel||'').toString().trim()).filter(x => x !== ''))).sort();
-  const kelases = Array.from(new Set(mapped.map(r => (r.Kelas||'').toString().trim()).filter(x => x !== ''))).sort();
+  const rombels = Array.from(new Set(mappedRows.map(r => (r.Rombel||'').toString().trim()).filter(x => x !== ''))).sort();
+  const kelases = Array.from(new Set(mappedRows.map(r => (r.Kelas||'').toString().trim()).filter(x => x !== ''))).sort();
 
   populateSelect(document.getElementById('filter-rombel'), rombels, true);
   populateSelect(document.getElementById('filter-kelas'), kelases, true);
 
-  // render full table initially
-  renderTable(mapped);
-}
+  // apply current selected filters (if any)
+  const rombelSel = document.getElementById('filter-rombel').value;
+  const kelasSel = document.getElementById('filter-kelas').value;
+  const filtered = mappedRows.filter(r => {
+    if (rombelSel && (r.Rombel||'').toString().trim() !== rombelSel) return false;
+    if (kelasSel && (r.Kelas||'').toString().trim() !== kelasSel) return false;
+    return true;
+  });
 
-function renderTable(dataRows) {
-  // build header row
-  const headers = ['Nama', 'NIS/NISN', 'Jenis Kelamin', 'Rombel', 'Kelas', 'Tanggal Lahir', 'Alamat'];
+  currentDisplayed = filtered;
+  renderTable(currentDisplayed);
+  document.getElementById('notice-text').textContent = `Hasil PROSES: ${currentDisplayed.length} baris tampil.`;
+});
+
+// render table helper
+function renderTable(rows) {
+  // table header
+  const headers = ['Nama', 'NIS / NISN', 'Jenis Kelamin', 'Rombel', 'Kelas', 'Tanggal Lahir', 'Alamat'];
   const headRow = document.getElementById('table-head-row');
   headRow.innerHTML = '';
   headers.forEach(h => {
@@ -221,15 +216,15 @@ function renderTable(dataRows) {
 
   const tbody = document.getElementById('table-body');
   tbody.innerHTML = '';
-  dataRows.forEach(r => {
+  rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(r.Nama)}</td>
-      <td>${escapeHtml(r.NIS_NISN)}</td>
-      <td>${escapeHtml(r.Jenis_Kelamin)}</td>
+      <td>${escapeHtml(r['NIS / NISN'])}</td>
+      <td>${escapeHtml(r['Jenis Kelamin'])}</td>
       <td>${escapeHtml(r.Rombel)}</td>
       <td>${escapeHtml(r.Kelas)}</td>
-      <td>${escapeHtml(r.Tanggal_Lahir)}</td>
+      <td>${escapeHtml(r['Tanggal Lahir'])}</td>
       <td>${escapeHtml(r.Alamat)}</td>
     `;
     tbody.appendChild(tr);
@@ -242,59 +237,51 @@ function escapeHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// filter events
-document.getElementById('filter-rombel').addEventListener('change', () => {
-  const v = document.getElementById('filter-rombel').value;
-  filterAndShow();
-});
-document.getElementById('filter-kelas').addEventListener('change', () => {
-  filterAndShow();
-});
-
-function filterAndShow() {
-  const rombel = document.getElementById('filter-rombel').value;
-  const kelas = document.getElementById('filter-kelas').value;
-  const filtered = rawData.filter(r => {
-    if (rombel && (r.Rombel || '').toString().trim() !== rombel) return false;
-    if (kelas && (r.Kelas || '').toString().trim() !== kelas) return false;
-    return true;
-  });
-  renderTable(filtered);
-}
-
-// download per rombel/kelas
+// download behavior - uses currentDisplayed if available; otherwise confirm
 document.getElementById('download-rombel-btn').addEventListener('click', () => {
-  const rombel = document.getElementById('filter-rombel').value;
-  if (!rombel) {
-    // ask user to choose or download all grouped
-    if (!confirm('Belum memilih rombel. Ingin men-generate file Excel terpisah untuk setiap rombel? (OK = ya, Cancel = batal)')) return;
-    downloadGroupedBy('Rombel');
-  } else {
-    downloadFilteredAsExcel(r => (r.Rombel||'').toString().trim() === rombel, `rombel_${sanitizeFilename(rombel)}.xlsx`);
+  const rombelSel = document.getElementById('filter-rombel').value;
+  if (!originalRows || originalRows.length === 0) { alert('Belum ada file.'); return; }
+  if (currentDisplayed && currentDisplayed.length > 0 && rombelSel) {
+    downloadFromRows(currentDisplayed, `rombel_${sanitizeFilename(rombelSel)}.xlsx`);
+    return;
   }
+  if (!rombelSel) {
+    if (!confirm('Belum memilih rombel. Generate file terpisah untuk setiap rombel? OK = ya')) return;
+    generateGrouped('Rombel');
+    return;
+  }
+  // fallback: if no processed data but selection exists attempt to filter mappedRows
+  const arr = (mappedRows && mappedRows.length) ? mappedRows.filter(r => (r.Rombel||'').toString().trim() === rombelSel) : [];
+  if (arr.length) downloadFromRows(arr, `rombel_${sanitizeFilename(rombelSel)}.xlsx`);
+  else alert('Tidak ada data untuk rombel terpilih. Lakukan PROSES terlebih dahulu.');
 });
 
 document.getElementById('download-kelas-btn').addEventListener('click', () => {
-  const kelas = document.getElementById('filter-kelas').value;
-  if (!kelas) {
-    if (!confirm('Belum memilih kelas. Ingin men-generate file Excel terpisah untuk setiap kelas? (OK = ya, Cancel = batal)')) return;
-    downloadGroupedBy('Kelas');
-  } else {
-    downloadFilteredAsExcel(r => (r.Kelas||'').toString().trim() === kelas, `kelas_${sanitizeFilename(kelas)}.xlsx`);
+  const kelasSel = document.getElementById('filter-kelas').value;
+  if (!originalRows || originalRows.length === 0) { alert('Belum ada file.'); return; }
+  if (currentDisplayed && currentDisplayed.length > 0 && kelasSel) {
+    downloadFromRows(currentDisplayed, `kelas_${sanitizeFilename(kelasSel)}.xlsx`);
+    return;
   }
+  if (!kelasSel) {
+    if (!confirm('Belum memilih kelas. Generate file terpisah untuk setiap kelas? OK = ya')) return;
+    generateGrouped('Kelas');
+    return;
+  }
+  const arr = (mappedRows && mappedRows.length) ? mappedRows.filter(r => (r.Kelas||'').toString().trim() === kelasSel) : [];
+  if (arr.length) downloadFromRows(arr, `kelas_${sanitizeFilename(kelasSel)}.xlsx`);
+  else alert('Tidak ada data untuk kelas terpilih. Lakukan PROSES terlebih dahulu.');
 });
 
-function downloadFilteredAsExcel(filterFn, filename) {
-  const rows = rawData.filter(filterFn);
-  if (!rows.length) { alert('Data kosong untuk kriteria ini.'); return; }
-  // prepare worksheet data: array of objects with header names
+function downloadFromRows(rows, filename) {
+  if (!rows || rows.length === 0) { alert('Data kosong.'); return; }
   const wsData = rows.map(r => ({
     'Nama Peserta Didik': r.Nama,
-    'NIS / NISN': r.NIS_NISN,
-    'Jenis Kelamin': r.Jenis_Kelamin,
+    'NIS / NISN': r['NIS / NISN'],
+    'Jenis Kelamin': r['Jenis Kelamin'],
     'Rombel': r.Rombel,
     'Kelas': r.Kelas,
-    'Tanggal Lahir': r.Tanggal_Lahir,
+    'Tanggal Lahir': r['Tanggal Lahir'],
     'Alamat': r.Alamat
   }));
   const wb = XLSX.utils.book_new();
@@ -303,41 +290,32 @@ function downloadFilteredAsExcel(filterFn, filename) {
   XLSX.writeFile(wb, filename);
 }
 
-function downloadGroupedBy(field) {
-  // group into multiple workbooks separated by field value, pack as multiple downloads one-by-one
+function generateGrouped(field) {
+  if (!mappedRows || mappedRows.length === 0) { alert('Belum ada data ter-proses. Klik PROSES dulu.'); return; }
   const groups = {};
-  rawData.forEach(r => {
-    const k = (r[field] || '').toString().trim() || '(kosong)';
+  mappedRows.forEach(r => {
+    const k = (r[field]||'').toString().trim() || '(kosong)';
     if (!groups[k]) groups[k] = [];
     groups[k].push(r);
   });
-  // iterate and trigger download for each
   for (const [k, arr] of Object.entries(groups)) {
     const fname = `${field.toLowerCase()}_${sanitizeFilename(k)}.xlsx`;
-    const wsData = arr.map(r => ({
-      'Nama Peserta Didik': r.Nama,
-      'NIS / NISN': r.NIS_NISN,
-      'Jenis Kelamin': r.Jenis_Kelamin,
-      'Rombel': r.Rombel,
-      'Kelas': r.Kelas,
-      'Tanggal Lahir': r.Tanggal_Lahir,
-      'Alamat': r.Alamat
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, 'Data');
-    XLSX.writeFile(wb, fname);
+    downloadFromRows(arr, fname);
   }
-  alert(`Selesai men-generate ${Object.keys(groups).length} file (satu per ${field.toLowerCase()}).`);
+  alert(`Selesai generate ${Object.keys(groups).length} file (satu per ${field}).`);
 }
 
 function sanitizeFilename(s) {
   return s.replace(/[\/\\?%*:|"<>]/g, '_').replace(/\s+/g,'_').slice(0,120);
 }
 
-// basic init
+// Loading indicator
+function showLoading(flag) {
+  const st = document.getElementById('load-status');
+  if (flag) st.classList.remove('hidden'); else st.classList.add('hidden');
+}
+
+// initial
 (function init(){
-  // set placeholder select states
-  document.getElementById('rombel-col-select').innerHTML = '<option value="">(belum ada file)</option>';
-  document.getElementById('kelas-col-select').innerHTML = '<option value="">(belum ada file)</option>';
+  resetApp();
 })();
