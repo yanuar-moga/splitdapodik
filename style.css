@@ -1,3 +1,6 @@
-/* style.css - tambahan kustom bila diperlukan */
+/* style.css - Modern Clean tweaks */
 body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-.card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 6px 20px rgba(15,23,42,0.06); }
+.card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 6px 20px rgba(15,23,42,0.06); margin-bottom: 1rem; }
+.dt-container { overflow-x: auto; }
+#students-table { width: 100% !important; }
+#students-table thead th { background: #f8fafc; }
