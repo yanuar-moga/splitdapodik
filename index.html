@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dapodik Mapper - SMPN 1 Moga</title>
+
+  <!-- Tailwind via CDN (untuk tampilan modern cepat) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- jQuery + DataTables -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+  <!-- SheetJS (xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* minor styling */
+    .card { @apply bg-white shadow-lg rounded-2xl p-6; }
+    /* make DataTable responsive container */
+    .dt-container { overflow-x: auto; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-6">
+
+  <div class="max-w-6xl mx-auto">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-semibold">Dapodik Mapper — SMPN 1 Moga</h1>
+      <div class="text-sm text-slate-600">Developer: Bayu — Web client (SheetJS + DataTables)</div>
+    </header>
+
+    <div class="card mb-6">
+      <div class="flex flex-col md:flex-row md:items-center gap-4">
+        <label class="block">
+          <div class="text-sm font-medium mb-1">Upload file Excel (.xlsx)</div>
+          <input id="file-input" type="file" accept=".xlsx, .xls" class="block w-full"/>
+        </label>
+
+        <div>
+          <div class="text-sm mb-1">Pilih tipe kolom rombel (deteksi otomatis ada)</div>
+          <select id="rombel-col-select" class="border rounded px-3 py-2 bg-white"></select>
+        </div>
+
+        <div>
+          <div class="text-sm mb-1">Pilih kolom kelas (deteksi otomatis)</div>
+          <select id="kelas-col-select" class="border rounded px-3 py-2 bg-white"></select>
+        </div>
+
+        <div class="ml-auto">
+          <button id="reset-btn" class="px-4 py-2 rounded bg-rose-500 text-white">Reset</button>
+        </div>
+      </div>
+
+      <div class="mt-4 text-sm text-slate-600">
+        Deteksi kolom yang dianjurkan: <code>Rombel Saat Ini_Unnamed: 42_level_1</code> (biasanya kolom AQ). Jika tidak muncul, pilih dari dropdown.
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <div class="flex items-center gap-4 mb-4">
+        <div>
+          <label class="block text-sm">Filter: </label>
+          <select id="filter-rombel" class="border rounded px-3 py-2"></select>
+        </div>
+
+        <div>
+          <label class="block text-sm">Filter Kelas: </label>
+          <select id="filter-kelas" class="border rounded px-3 py-2"></select>
+        </div>
+
+        <div class="ml-auto flex gap-2">
+          <button id="download-rombel-btn" class="px-4 py-2 rounded bg-blue-600 text-white">Download per Rombel</button>
+          <button id="download-kelas-btn" class="px-4 py-2 rounded bg-green-600 text-white">Download per Kelas</button>
+        </div>
+      </div>
+
+      <div class="dt-container">
+        <table id="students-table" class="display stripe hover" style="width:100%">
+          <thead>
+            <tr id="table-head-row"></tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer class="text-sm text-slate-500 text-center mt-8">
+      Petunjuk singkat: upload file → pilih kolom jika perlu → pilih rombel/kelas → klik download.
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
