@@ -3,65 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sorter Data Siswa - SMPN 1 Moga</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Filter Data Rombel - SMPN 1 Moga</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-light">
   <div class="container-fluid p-3">
-    <h4 class="fw-bold text-primary mb-3">📊 Sorter Data Siswa - SMPN 1 Moga</h4>
+    <h4 class="fw-bold text-primary mb-3">📘 Filter Data Rombel - SMPN 1 Moga</h4>
 
     <div class="card shadow-sm mb-3">
       <div class="card-body">
+        <!-- Upload File -->
         <div class="row g-2 mb-2">
-          <div class="col-md-6">
+          <div class="col-md-8">
             <input type="file" id="fileInput" class="form-control form-control-sm" accept=".xlsx,.xls" />
           </div>
-          <div class="col-md-6 d-grid">
-            <button id="loadFileBtn" class="btn btn-sm btn-primary">Load File</button>
+          <div class="col-md-4 d-grid">
+            <button id="loadFileBtn" class="btn btn-sm btn-primary">Upload & Baca File</button>
           </div>
         </div>
-        <div id="status" class="small text-muted mb-2">Belum ada file dimuat.</div>
 
-        <div id="sortOptions" style="display:none;">
-          <label class="form-label small mb-1">Pilih kolom untuk sorting manual:</label>
-          <select id="sortColumn" class="form-select form-select-sm mb-2">
-            <option value="A">A - No</option>
-            <option value="B">B - Nama</option>
-            <option value="C">C - NIPD</option>
-            <option value="D">D - JK</option>
-            <option value="E">E - NISN</option>
-            <option value="F">F - Tempat Lahir</option>
-            <option value="G">G - Tanggal Lahir</option>
-            <option value="H">H - NIK</option>
-            <option value="I">I - Agama</option>
-            <option value="J">J - Alamat</option>
-            <option value="K">K - RT</option>
-            <option value="L">L - RW</option>
-            <option value="M">M - Dusun</option>
-            <option value="N">N - Kelurahan</option>
-            <option value="O">O - Kecamatan</option>
-            <option value="P">P - Kodepos</option>
-            <option value="Q">Q - Jenis Tinggal</option>
-            <option value="R">R - Alat Transportasi</option>
-            <option value="S">S - Telepon</option>
-            <option value="T">T - HP</option>
-            <option value="U">U - Email</option>
-            <option value="V">V - SKHUN</option>
-            <option value="W">W - Penerima KPS</option>
-            <option value="X">X - No KPS</option>
-          </select>
-          <button id="processBtn" class="btn btn-sm btn-secondary w-100">Proses Sorting Manual</button>
+        <div id="status" class="small text-muted mb-3">Belum ada file diunggah.</div>
+
+        <!-- Pilih Rombel -->
+        <div id="rombelSection" style="display:none;">
+          <div class="row g-2 mb-2">
+            <div class="col-md-6">
+              <label class="form-label small">Pilih Kolom Rombel (default: AQ)</label>
+              <select id="rombelColumn" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">Pilih Nama Rombel</label>
+              <select id="rombelName" class="form-select form-select-sm">
+                <option value="">-- Pilih rombel --</option>
+              </select>
+            </div>
+          </div>
+          <button id="processBtn" class="btn btn-sm btn-success w-100">Tampilkan Data Rombel</button>
         </div>
 
         <div id="exportSection" class="mt-3" style="display:none;">
-          <a id="exportBtn" class="btn btn-success btn-sm w-100">⬇️ Export ke Excel</a>
+          <a id="exportBtn" class="btn btn-sm btn-success w-100">⬇️ Export ke Excel</a>
         </div>
       </div>
     </div>
 
-    <div class="table-responsive shadow-sm bg-white p-2 rounded">
+    <!-- Tabel -->
+    <div class="table-responsive bg-white p-2 rounded shadow-sm">
       <table class="table table-striped table-sm mb-0">
         <thead id="resultHead" class="table-primary"></thead>
         <tbody id="resultBody"></tbody>
@@ -69,6 +58,6 @@
     </div>
   </div>
 
-  <script src="script_v4_sortAQ.js"></script>
+  <script src="script_v6_rombel.js"></script>
 </body>
 </html>
