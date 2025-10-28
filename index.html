@@ -1,126 +1,94 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Filter & Sort Data - SMPN 1 Moga (v3)</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Siswa - SMPN 1 Moga (v3 Final)</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-light">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">Data Siswa - SMPN 1 Moga (v3)</a>
-    </div>
-  </nav>
+  <div class="container-fluid p-3">
+    <h4 class="fw-bold text-primary mb-3">📘 Data Siswa - SMPN 1 Moga (v3 Final)</h4>
 
-  <div class="container">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card mb-3">
+    <div class="row">
+      <!-- Panel kiri: Upload dan kolom -->
+      <div class="col-lg-4 col-md-5">
+        <div class="card shadow-sm mb-3">
           <div class="card-body">
-            <h5 class="card-title">Upload / Sumber Data (Header row ke-6 otomatis)</h5>
-            <div class="mb-2">
-              <div class="mb-2">
-  <input type="file" id="fileInput" class="form-control" accept=".xlsx,.xls,.csv">
-</div>
+            <h6 class="fw-semibold mb-2">Upload / Sumber Data</h6>
+            <p class="text-muted small mb-2">Header baris ke-6 otomatis dibaca (A6 = No, B6 = Nama, ...)</p>
 
-<div class="row mb-2">
-  <div class="col-6">
-    <label class="form-label small">Mulai kolom</label>
-    <select id="colStart" class="form-select form-select-sm"></select>
-  </div>
-  <div class="col-6">
-    <label class="form-label small">Sampai kolom</label>
-    <select id="colEnd" class="form-select form-select-sm"></select>
-  </div>
-</div>
-
-<div class="mb-2">
-  <button id="loadFileBtn" class="btn btn-primary w-100">Load File</button>
-</div>
-
-            <div class="mb-2 text-muted small">Sistem otomatis membaca header di <strong>baris 6</strong> (A6 = No, B6 = Nama, ...).</div>
-            <hr>
-            <h5 class="card-title">Pilih kolom</h5>
-            <div class="mb-2">
-              <button id="selectAllBtn" class="btn btn-sm btn-outline-secondary">Pilih Semua</button>
-              <button id="deselectAllBtn" class="btn btn-sm btn-outline-secondary">Reset Pilihan</button>
+            <!-- Input file dan Load Kolom sejajar -->
+            <div class="row g-2 mb-2 align-items-center">
+              <div class="col-7">
+                <input type="file" id="fileInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+              </div>
+              <div class="col-5 d-flex gap-1">
+                <select id="loadColumn" class="form-select form-select-sm flex-fill"></select>
+                <button id="loadFileBtn" class="btn btn-sm btn-primary flex-fill">Load File</button>
+              </div>
             </div>
-            <form id="columnsForm" class="mb-2">
-              <div id="columnsCheckboxes" class="mb-2" style="max-height:300px; overflow:auto;"></div>
-              <div class="mb-2">
-                <input type="text" id="searchCols" class="form-control" placeholder="Cari kolom...">
-              </div>
-              <div class="d-grid gap-2">
-                <button type="button" id="processBtn" class="btn btn-success">Proses</button>
-                <button type="button" id="clearDataBtn" class="btn btn-outline-danger">Hapus Data Upload</button>
-              </div>
-            </form>
 
-            <hr>
-            <h6>Fitur tambahan</h6>
+            <!-- Kolom checkbox -->
+            <div class="mb-2">
+              <input type="text" id="searchCols" class="form-control form-control-sm" placeholder="Cari kolom...">
+            </div>
+            <div id="columnsCheckboxes" class="border rounded p-2 small" style="max-height:200px; overflow:auto;"></div>
+
+            <div class="d-flex justify-content-between mt-2">
+              <button id="selectAllBtn" class="btn btn-sm btn-success">Pilih Semua</button>
+              <button id="deselectAllBtn" class="btn btn-sm btn-warning">Reset Pilihan</button>
+              <button id="clearDataBtn" class="btn btn-sm btn-danger">Hapus Data</button>
+            </div>
+
+            <button id="processBtn" class="btn btn-secondary w-100 mt-3">Terapkan Kolom</button>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+          <div class="card-body small">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="enableSearch" checked>
-              <label class="form-check-label" for="enableSearch">Tampilkan search bar</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="enableExport" checked>
-              <label class="form-check-label" for="enableExport">Enable export XLSX</label>
+              <label class="form-check-label" for="enableSearch">Aktifkan Pencarian</label>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="enableSort" checked>
-              <label class="form-check-label" for="enableSort">Enable sort by header</label>
+              <label class="form-check-label" for="enableSort">Aktifkan Sort</label>
             </div>
-
-            <hr>
-            <small class="text-muted">Data diproses di browser. File tidak dikirim ke server.</small>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-body">
-            <h6>Export / Unduh</h6>
-            <div class="d-grid gap-2">
-              <a id="downloadFilteredBtn" class="btn btn-primary" href="#" style="display:none;">Unduh hasil filter (.xlsx)</a>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="enableExport" checked>
+              <label class="form-check-label" for="enableExport">Aktifkan Export</label>
             </div>
           </div>
         </div>
 
+        <div class="small text-muted" id="status">Siap memuat file...</div>
       </div>
 
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-body">
-            <div id="toolbar" class="mb-2" style="display:none;">
-              <div class="row g-2">
-                <div class="col">
-                  <input id="globalSearch" class="form-control" placeholder="Cari data (nama, no, ... )">
-                </div>
-                <div class="col-auto">
-                  <button id="clearSearch" class="btn btn-sm btn-outline-secondary">Clear</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table id="resultTable" class="table table-striped table-bordered table-sm">
-                <thead id="resultHead"></thead>
-                <tbody id="resultBody"></tbody>
-              </table>
-            </div>
-
-            <div id="status" class="mt-2 text-muted"></div>
+      <!-- Panel kanan: Tabel hasil -->
+      <div class="col-lg-8 col-md-7">
+        <div id="toolbar" class="mb-2" style="display:none;">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">Cari</span>
+            <input type="text" id="globalSearch" class="form-control" placeholder="Cari data...">
+            <button id="clearSearch" class="btn btn-outline-secondary">Clear</button>
+            <a id="downloadFilteredBtn" class="btn btn-success" style="display:none;">⬇️ Export XLSX</a>
           </div>
         </div>
-      </div>
 
+        <div class="table-responsive border rounded bg-white shadow-sm">
+          <table class="table table-striped table-hover table-sm mb-0">
+            <thead id="resultHead" class="table-primary"></thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
-<!-- SheetJS for Excel parsing and writing, PapaParse for CSV -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="script_v3.js"></script>
+  <script src="script_v3.js"></script>
 </body>
 </html>
