@@ -1,4 +1,4 @@
-// script_v4_sortAQ.js - Versi: Sort by AQ otomatis + sort manual
+// script_v6_rombel.js - Upload Excel → Pilih kolom AQ → Pilih rombel → Tampilkan data
 const MAPPING = {
   "A": "No", "B": "Nama", "C": "NIPD", "D": "JK", "E": "NISN",
   "F": "Tempat Lahir", "G": "Tanggal Lahir", "H": "NIK", "I": "Agama",
@@ -7,11 +7,11 @@ const MAPPING = {
   "S": "Telepon", "T": "HP", "U": "Email", "V": "SKHUN", "W": "Penerima KPS", "X": "No KPS"
 };
 
-let dataRows = [];
 let headers = [];
-let sortedData = [];
+let allRows = [];
+let filteredRows = [];
 
-/* ------------------ 1️⃣ Load File ------------------ */
+/* ========== 1️⃣ Saat klik Upload & Baca File ========== */
 document.getElementById("loadFileBtn").addEventListener("click", () => {
   const file = document.getElementById("fileInput").files[0];
   if (!file) return alert("Pilih file Excel terlebih dahulu.");
@@ -26,53 +26,96 @@ document.getElementById("loadFileBtn").addEventListener("click", () => {
   reader.readAsArrayBuffer(file);
 });
 
+/* ========== 2️⃣ Proses Excel (auto deteksi header & isi) ========== */
 function processExcel(aoa) {
-  // Gabungkan header 2 baris (baris 5 & 6)
-  const headerRow = aoa[5] || [];
-  const prevHeader = aoa[4] || [];
-  headers = headerRow.map((v, i) => {
-    const top = prevHeader[i]?.trim() || "";
-    const bottom = v?.trim() || "";
+  if (!aoa.length) return alert("File kosong atau tidak terbaca.");
+
+  // Deteksi baris header otomatis (baris dengan isi terbanyak)
+  let headerRow = 0, maxFilled = 0;
+  for (let i = 0; i < Math.min(10, aoa.length); i++) {
+    const filled = aoa[i].filter(v => String(v).trim() !== "").length;
+    if (filled > maxFilled) { maxFilled = filled; headerRow = i; }
+  }
+
+  headers = aoa[headerRow].map((v, i) => {
     const letter = columnLetter(i);
-    return MAPPING[letter] || `${top || bottom || "Col_" + letter}`;
+    return MAPPING[letter] || (v || "Kolom_" + letter);
   });
 
-  // Data mulai dari baris ke-7
-  dataRows = aoa.slice(6).filter(row => row.some(v => String(v).trim() !== ""));
-  if (dataRows.length === 0) {
-    alert("Tidak ada data ditemukan di file ini.");
+  allRows = aoa.slice(headerRow + 1).filter(r => r.some(v => String(v).trim() !== ""));
+
+  document.getElementById("status").textContent = `✅ File dimuat (${allRows.length} baris data ditemukan)`;
+  setupRombelSelector();
+}
+
+/* ========== 3️⃣ Siapkan pilihan kolom rombel & nama rombel ========== */
+function setupRombelSelector() {
+  const rombelColSelect = document.getElementById("rombelColumn");
+  const rombelNameSelect = document.getElementById("rombelName");
+  rombelColSelect.innerHTML = "";
+  rombelNameSelect.innerHTML = `<option value="">-- Pilih rombel --</option>`;
+
+  // Daftar kolom A–BN
+  const letters = [];
+  for (let i = 0; i < 66; i++) {
+    const first = String.fromCharCode(65 + Math.floor(i / 26) - (i < 26 ? 0 : 1));
+    const second = String.fromCharCode(65 + (i % 26));
+    letters.push(i < 26 ? second : first + second);
+  }
+
+  letters.forEach(l => {
+    const opt = document.createElement("option");
+    opt.value = l;
+    opt.textContent = `${l}`;
+    if (l === "AQ") opt.selected = true;
+    rombelColSelect.appendChild(opt);
+  });
+
+  // Tampilkan section rombel
+  document.getElementById("rombelSection").style.display = "";
+
+  // Isi nama rombel otomatis saat kolom dipilih
+  rombelColSelect.addEventListener("change", () => {
+    const colIndex = columnIndex(rombelColSelect.value);
+    const uniqueValues = [...new Set(allRows.map(r => r[colIndex]).filter(Boolean))].sort();
+    rombelNameSelect.innerHTML = `<option value="">-- Pilih rombel --</option>`;
+    uniqueValues.forEach(val => {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = val;
+      rombelNameSelect.appendChild(opt);
+    });
+  });
+
+  // Trigger awal (kolom AQ)
+  rombelColSelect.dispatchEvent(new Event("change"));
+}
+
+/* ========== 4️⃣ Proses Filter Rombel ========== */
+document.getElementById("processBtn").addEventListener("click", () => {
+  const colLetter = document.getElementById("rombelColumn").value;
+  const rombelName = document.getElementById("rombelName").value;
+  if (!rombelName) return alert("Pilih nama rombel terlebih dahulu.");
+
+  const colIdx = columnIndex(colLetter);
+  filteredRows = allRows.filter(r => String(r[colIdx]).trim() === rombelName.trim());
+
+  if (filteredRows.length === 0) {
+    alert("Tidak ada data untuk rombel " + rombelName);
     return;
   }
 
-  // Sort otomatis berdasarkan kolom AQ (kolom ke-42)
-  const aqIndex = 42; // A=0 → AQ=42
-  dataRows.sort((a, b) => String(a[aqIndex] || "").localeCompare(String(b[aqIndex] || "")));
-
-  renderTable(headers, dataRows);
-  document.getElementById("status").textContent = `✅ File dimuat (${dataRows.length} baris), otomatis diurut berdasarkan kolom AQ`;
-  document.getElementById("sortOptions").style.display = "";
-}
-
-/* ------------------ 2️⃣ Sort Manual ------------------ */
-document.getElementById("processBtn").addEventListener("click", () => {
-  const selected = document.getElementById("sortColumn").value;
-  const index = columnIndex(selected);
-  if (index === -1) return alert("Kolom tidak valid.");
-
-  sortedData = [...dataRows].sort((a, b) =>
-    String(a[index] || "").localeCompare(String(b[index] || ""))
-  );
-
-  renderTable(headers, sortedData);
-  document.getElementById("status").textContent = `🔄 Data diurut berdasarkan kolom ${selected}`;
+  renderTable(headers, filteredRows);
   document.getElementById("exportSection").style.display = "";
+  document.getElementById("status").textContent = `📋 Menampilkan ${filteredRows.length} data untuk ${rombelName}`;
 });
 
-/* ------------------ 3️⃣ Render Tabel ------------------ */
+/* ========== 5️⃣ Tampilkan tabel ========== */
 function renderTable(heads, rows) {
   const thead = document.getElementById("resultHead");
   const tbody = document.getElementById("resultBody");
-  thead.innerHTML = ""; tbody.innerHTML = "";
+  thead.innerHTML = "";
+  tbody.innerHTML = "";
 
   const tr = document.createElement("tr");
   heads.forEach(h => {
@@ -93,18 +136,17 @@ function renderTable(heads, rows) {
   });
 }
 
-/* ------------------ 4️⃣ Export Excel ------------------ */
+/* ========== 6️⃣ Export ke Excel ========== */
 document.getElementById("exportBtn").addEventListener("click", () => {
   const ws_data = [headers];
-  const exp = sortedData.length ? sortedData : dataRows;
-  exp.forEach(r => ws_data.push(r));
+  filteredRows.forEach(r => ws_data.push(r));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  XLSX.utils.book_append_sheet(wb, ws, "Sorted Data");
-  XLSX.writeFile(wb, "Data_Sorted.xlsx");
+  XLSX.utils.book_append_sheet(wb, ws, "Rombel");
+  XLSX.writeFile(wb, "Data_Rombel.xlsx");
 });
 
-/* ------------------ 5️⃣ Helper ------------------ */
+/* ========== Helper ========== */
 function columnLetter(idx) {
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   if (idx < 26) return A[idx];
