@@ -1,65 +1,75 @@
-// script_v3.js - Final (Load Kolom tunggal + header baris 5 & 6 otomatis)
-const HEADER_ROW_INDEX = 5; // baris ke-6 (0-based)
+// script_v3.js - Versi final static A–BN
+const HEADER_ROW_INDEX = 5;
 const MAPPING = {
   "A": "No", "B": "Nama", "C": "NIPD", "D": "JK", "E": "NISN",
-  "F": "Tempat Lahir", "G": "Tanggal Lahir", "H": "NIK",
-  "I": "Agama", "J": "Alamat", "K": "RT", "L": "RW", "M": "Dusun",
-  "N": "Kelurahan", "O": "Kecamatan", "P": "Kodepos",
-  "Q": "Jenis Tinggal", "R": "Alat Transportasi", "S": "Telepon",
-  "T": "HP", "U": "Email", "V": "SKHUN", "W": "Penerima KPS", "X": "No KPS"
+  "F": "Tempat Lahir", "G": "Tanggal Lahir", "H": "NIK", "I": "Agama",
+  "J": "Alamat", "K": "RT", "L": "RW", "M": "Dusun", "N": "Kelurahan",
+  "O": "Kecamatan", "P": "Kodepos", "Q": "Jenis Tinggal", "R": "Alat Transportasi",
+  "S": "Telepon", "T": "HP", "U": "Email", "V": "SKHUN", "W": "Penerima KPS", "X": "No KPS"
 };
 
-let rawData = [];
-let selectedCols = [];
-let filteredData = [];
+let rawData = [], selectedCols = [], filteredData = [];
 let currentSort = { col: null, asc: true };
 
-function setStatus(msg) {
-  document.getElementById("status").textContent = msg;
-}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
 
-/* =====================================================
-   1️⃣ Buat daftar kolom (A sampai BN)
-===================================================== */
-function generateColLetters() {
-  const letters = [];
-  for (let i = 0; i < 66; i++) {
-    if (i < 26) letters.push(String.fromCharCode(65 + i));
-    else {
-      const first = String.fromCharCode(64 + Math.floor(i / 26));
-      const second = String.fromCharCode(65 + (i % 26));
-      letters.push(first + second);
+/* Load file */
+document.getElementById("loadFileBtn").addEventListener("click", () => {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) return alert("Pilih file terlebih dahulu.");
+  const name = file.name.toLowerCase();
+  const reader = new FileReader();
+  reader.onload = e => {
+    if (name.endsWith(".csv")) {
+      const parsed = Papa.parse(e.target.result, { skipEmptyLines: true });
+      handleParsedArray(parsed.data);
+    } else {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      handleParsedArray(aoa);
     }
-  }
-  return letters;
-}
+  };
+  if (name.endsWith(".csv")) reader.readAsText(file, "utf-8");
+  else reader.readAsArrayBuffer(file);
+});
 
-function populateColDropdown() {
-  const cols = generateColLetters();
-  const colSel = document.getElementById("loadColumn");
-  cols.forEach(l => {
-    colSel.add(new Option("Sampai kolom " + l, l));
+/* Proses data */
+function handleParsedArray(aoa) {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").concat(
+    Array.from({ length: 26 }, (_, i) => "A" + String.fromCharCode(65 + i))
+  );
+  const endCol = document.getElementById("loadColumn").value;
+  const endIndex = letters.indexOf(endCol);
+  const range = aoa.map(r => r.slice(0, endIndex + 1));
+
+  const prev = range[HEADER_ROW_INDEX - 1] || [];
+  const curr = range[HEADER_ROW_INDEX] || [];
+  const headers = curr.map((v, i) => {
+    const upper = prev[i] ? prev[i].trim() : "";
+    const lower = v ? v.trim() : "";
+    const key = letters[i];
+    return (MAPPING[key] || (upper || lower || "Col_" + key));
   });
-  colSel.value = "BN";
-}
-populateColDropdown();
 
-/* =====================================================
-   2️⃣ Mapping header
-===================================================== */
-function mapHeaders(rawHeaders) {
-  const result = [];
-  for (let i = 0; i < rawHeaders.length; i++) {
-    let h = rawHeaders[i] ? String(rawHeaders[i]).trim() : "";
-    if (h === "" || h.toLowerCase().startsWith("unnamed")) {
-      const letter = String.fromCharCode(65 + i);
-      h = MAPPING[letter] || "Col_" + (i + 1);
-    }
-    result.push(h);
+  const records = [];
+  for (let i = HEADER_ROW_INDEX + 1; i < range.length; i++) {
+    const row = range[i];
+    if (!row) continue;
+    const obj = {};
+    headers.forEach((h, j) => obj[h] = row[j] ?? "");
+    records.push(obj);
   }
-  return result;
+
+  rawData = records;
+  populateColumnCheckboxes(Object.keys(rawData[0]));
+  selectedCols = Object.keys(rawData[0]).slice(0, 3);
+  applyFilterAndRender();
+  setStatus(`File dimuat (${records.length} baris) — Kolom A–${endCol}`);
 }
 
+/* Checkbox kolom */
 function populateColumnCheckboxes(cols) {
   const container = document.getElementById("columnsCheckboxes");
   container.innerHTML = "";
@@ -74,71 +84,7 @@ function populateColumnCheckboxes(cols) {
   });
 }
 
-/* =====================================================
-   3️⃣ Load file Excel/CSV
-===================================================== */
-document.getElementById("loadFileBtn").addEventListener("click", () => {
-  const f = document.getElementById("fileInput").files[0];
-  if (!f) return alert("Pilih file terlebih dahulu.");
-  const name = f.name.toLowerCase();
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    if (name.endsWith(".csv")) {
-      const parsed = Papa.parse(e.target.result, { skipEmptyLines: true });
-      handleParsedArray(parsed.data);
-    } else {
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-      handleParsedArray(aoa);
-    }
-  };
-  if (name.endsWith(".csv")) reader.readAsText(f, "utf-8");
-  else reader.readAsArrayBuffer(f);
-});
-
-/* =====================================================
-   4️⃣ Proses data
-===================================================== */
-function handleParsedArray(aoa) {
-  const colLetters = generateColLetters();
-  const endCol = document.getElementById("loadColumn").value;
-  const endIndex = colLetters.indexOf(endCol);
-  const range = aoa.map(r => r.slice(0, endIndex + 1));
-
-  const prevRow = range[HEADER_ROW_INDEX - 1] || [];
-  const currentRow = range[HEADER_ROW_INDEX] || [];
-  const combinedHeaders = currentRow.map((val, i) => {
-    const upper = prevRow[i] ? String(prevRow[i]).trim() : "";
-    const lower = val ? String(val).trim() : "";
-    if (upper && lower) return `${upper} - ${lower}`;
-    if (upper && !lower) return upper;
-    if (!upper && lower) return lower;
-    return "Col_" + (i + 1);
-  });
-
-  const headers = mapHeaders(combinedHeaders);
-  const records = [];
-  for (let i = HEADER_ROW_INDEX + 1; i < range.length; i++) {
-    const row = range[i];
-    if (!row) continue;
-    const obj = {};
-    headers.forEach((h, j) => obj[h] = row[j] ?? "");
-    records.push(obj);
-  }
-
-  rawData = records;
-  populateColumnCheckboxes(Object.keys(rawData[0]));
-  selectedCols = Object.keys(rawData[0]).slice(0, 3);
-  setStatus(`File dimuat (${records.length} baris) — Kolom A sampai ${endCol}`);
-  applyFilterAndRender();
-}
-
-/* =====================================================
-   5️⃣ Fitur tabel dan tombol
-===================================================== */
+/* Tombol */
 document.getElementById("selectAllBtn").onclick = () => {
   document.querySelectorAll(".col-check").forEach(c => c.checked = true);
 };
@@ -159,6 +105,8 @@ document.getElementById("processBtn").onclick = () => {
   applyFilterAndRender();
   toggleToolbar();
 };
+
+/* Pencarian kolom */
 document.getElementById("searchCols").oninput = e => {
   const q = e.target.value.toLowerCase();
   document.querySelectorAll("#columnsCheckboxes .form-check").forEach(div => {
@@ -171,9 +119,7 @@ function toggleToolbar() {
     document.getElementById("enableSearch").checked ? "" : "none";
 }
 
-/* =====================================================
-   6️⃣ Render tabel, sort, export
-===================================================== */
+/* Render tabel */
 function applyFilterAndRender() {
   filteredData = rawData.map(r => {
     const out = {}; selectedCols.forEach(c => out[c] = r[c] ?? "");
@@ -181,20 +127,17 @@ function applyFilterAndRender() {
   });
   renderTable(filteredData);
   prepareDownload(filteredData);
-  setStatus(`Menampilkan ${filteredData.length} baris`);
 }
 
 function renderTable(data) {
   const head = document.getElementById("resultHead");
   const body = document.getElementById("resultBody");
-  head.innerHTML = "";
-  body.innerHTML = "";
+  head.innerHTML = ""; body.innerHTML = "";
 
   const tr = document.createElement("tr");
   selectedCols.forEach(c => {
     const th = document.createElement("th");
-    th.textContent = c;
-    th.style.cursor = "pointer";
+    th.textContent = c; th.style.cursor = "pointer";
     th.onclick = () => sortByColumn(c);
     tr.appendChild(th);
   });
@@ -211,6 +154,7 @@ function renderTable(data) {
   });
 }
 
+/* Sort */
 function sortByColumn(col) {
   if (currentSort.col === col) currentSort.asc = !currentSort.asc;
   else { currentSort.col = col; currentSort.asc = true; }
@@ -222,6 +166,7 @@ function sortByColumn(col) {
   renderTable(filteredData);
 }
 
+/* Export */
 function prepareDownload(data) {
   const btn = document.getElementById("downloadFilteredBtn");
   if (!data.length) { btn.style.display = "none"; return; }
@@ -237,9 +182,7 @@ function prepareDownload(data) {
   btn.style.display = document.getElementById("enableExport").checked ? "" : "none";
 }
 
-/* =====================================================
-   7️⃣ Pencarian global
-===================================================== */
+/* Pencarian global */
 document.getElementById("globalSearch").oninput = e => {
   const q = e.target.value.toLowerCase();
   if (!q) return renderTable(filteredData);
