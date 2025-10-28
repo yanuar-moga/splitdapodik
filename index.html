@@ -21,11 +21,25 @@
           <div class="card-body">
             <h5 class="card-title">Upload / Sumber Data (Header row ke-6 otomatis)</h5>
             <div class="mb-2">
-              <input type="file" id="fileInput" class="form-control" accept=".xlsx,.xls,.csv">
-            </div>
-            <div class="mb-2">
-              <button id="loadFileBtn" class="btn btn-primary w-100">Load File</button>
-            </div>
+              <div class="mb-2">
+  <input type="file" id="fileInput" class="form-control" accept=".xlsx,.xls,.csv">
+</div>
+
+<div class="row mb-2">
+  <div class="col-6">
+    <label class="form-label small">Mulai kolom</label>
+    <select id="colStart" class="form-select form-select-sm"></select>
+  </div>
+  <div class="col-6">
+    <label class="form-label small">Sampai kolom</label>
+    <select id="colEnd" class="form-select form-select-sm"></select>
+  </div>
+</div>
+
+<div class="mb-2">
+  <button id="loadFileBtn" class="btn btn-primary w-100">Load File</button>
+</div>
+
             <div class="mb-2 text-muted small">Sistem otomatis membaca header di <strong>baris 6</strong> (A6 = No, B6 = Nama, ...).</div>
             <hr>
             <h5 class="card-title">Pilih kolom</h5>
