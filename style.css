@@ -1,5 +1,0 @@
-
-body { font-family: Arial, sans-serif; text-align:center; }
-header { display:flex; justify-content:center; align-items:center; gap:20px; }
-table { margin:auto; border-collapse:collapse; width:80%; }
-th, td { padding:8px; }
