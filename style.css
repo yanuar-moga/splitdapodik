@@ -1,0 +1,6 @@
+
+body { font-family: Arial, sans-serif; text-align:center; padding: 10px; }
+header { display:flex; justify-content:center; align-items:center; gap:20px; }
+table { margin:auto; border-collapse:collapse; width:90%; font-size:14px; }
+th, td { padding:6px; text-align:center; }
+input, select, button { font-size:14px; padding:6px; }
