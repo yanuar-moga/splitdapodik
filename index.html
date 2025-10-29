@@ -99,11 +99,18 @@ function handleFile(e) {
         if (rombel) rombelList.push(rombel);
       }
     });
+
+    // Hilangkan duplikat dan sort
     rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+
+    // 🚫 Hapus nilai header yang salah (seperti 'Rombel Saat Ini')
+    rombelList = rombelList.filter(r => r.toLowerCase() !== "rombel saat ini");
+
     if (rombelList.length === 0) {
       document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom 'Rombel Saat Ini' (AQ) tidak ditemukan!</p>";
       return;
     }
+
     const selectHTML = `
       <label for="rombelSelect">Pilih Rombel:</label>
       <select id="rombelSelect">
@@ -112,6 +119,7 @@ function handleFile(e) {
       </select>
       <button onclick="filterRombel()">Proses Filter</button>
       <button onclick="downloadExcel()">Download Excel</button>
+      <p style="margin-top:5px;color:#555;">Daftar Rombel Ditemukan (${rombelList.length}):<br>• ${rombelList.join("<br>• ")}</p>
     `;
     document.getElementById("output").innerHTML = `<p>✅ File berhasil dimuat!</p>${selectHTML}`;
   };
