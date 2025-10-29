@@ -5,71 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aplikasi Filter Data Dapodik per Rombel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
   body {
     font-family: "Segoe UI", Arial, sans-serif;
-    margin: 0;
-    background: #eef3f7;
+    margin: 30px;
+    background: #f9fafb;
     color: #222;
   }
-
-  header {
-    background: #003366;
-    color: white;
-    padding: 15px 25px;
+  h1 {
+    font-size: 22px;
+    color: #2c3e50;
     display: flex;
     align-items: center;
-    gap: 15px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    gap: 10px;
   }
-
-  header img {
-    height: 55px;
+  h1::before {
+    content: "📊";
+  }
+  label {
+    font-weight: 600;
+    margin-right: 5px;
+  }
+  input[type="file"], select, button {
+    margin: 5px 0;
+    padding: 6px 10px;
     border-radius: 6px;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: 24px;
-  }
-
-  .container {
-    padding: 25px;
-  }
-
-  select, input[type="file"], button {
-    margin: 6px 0;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #bbb;
+    border: 1px solid #ccc;
     font-size: 14px;
   }
-
   button {
-    background: #0077CC;
+    background: #3498db;
     color: white;
-    border: none;
     cursor: pointer;
-    font-weight: 600;
+    transition: 0.2s;
   }
   button:hover {
-    background: #005fa3;
+    background: #2980b9;
   }
-
-  .info-box {
-    background: #fff;
-    padding: 12px 14px;
-    border-radius: 8px;
-    margin-top: 10px;
-    border-left: 4px solid #0077CC;
-  }
-
   table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
     background: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
   }
   th, td {
     border: 1px solid #ccc;
@@ -77,103 +55,74 @@
     text-align: left;
   }
   th {
-    background: #d8e6f3;
+    background: #eef3f7;
   }
-
-  #columnSelector {
-    margin-top: 20px;
-    padding: 12px;
-    background: #fff;
-    border-radius: 8px;
-    border-left: 4px solid #0077CC;
-  }
-  #columnSelector label {
-    display: inline-block;
-    margin: 4px 6px;
-    padding: 6px 8px;
-    background: #f1f6fc;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
+  .loading {
+    color: #555;
+    font-style: italic;
   }
 </style>
 </head>
 <body>
 
-<header>
-  <img src="assets/logo.jpg" alt="Logo Sekolah">
-  <h1>Aplikasi Filter Data Dapodik per Rombel</h1>
-</header>
+<h1>Aplikasi Filter Data Dapodik per Rombel</h1>
 
-<div class="container">
-  <input type="file" id="excelFile" accept=".xlsx, .xls" />
-  <div id="output" class="info-box"></div>
-  <div id="tableContainer"></div>
-
-  <div id="columnSelector" style="display:none;">
-    <h3>🔍 Pilih Kolom Ditampilkan</h3>
-    <div id="columnCheckboxes"></div>
-    <button onclick="showSelectedColumns()">Tampilkan Kolom</button>
-    <button onclick="downloadSelectedColumns()">Download XLSX</button>
-  </div>
-
-  <div id="filteredColumnsContainer"></div>
-</div>
+<input type="file" id="excelFile" accept=".xlsx, .xls" />
+<div id="output"></div>
+<div id="tableContainer"></div>
 
 <script>
 let fullData = [];
 let headerRow = [];
 let filteredData = [];
-let selectedData = [];
 
 document.getElementById("excelFile").addEventListener("change", handleFile, false);
 
 function handleFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-
-  document.getElementById("output").innerHTML = "⏳ Membaca file...";
-
   const reader = new FileReader();
+  document.getElementById("output").innerHTML = "<p class='loading'>⏳ Membaca file Excel...</p>";
   reader.onload = function (e) {
     const data = new Uint8Array(e.target.result);
     const workbook = XLSX.read(data, { type: "array" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    headerRow = json[4];
-    fullData = json.slice(5);
-
-    const colIndex = 42;
+    headerRow = json[4]; // karena baris ke-5 adalah header sebenarnya
+    fullData = json.slice(5); // data mulai dari baris ke-6
+    const colIndex = 42; // kolom AQ = Rombel Saat Ini
     let rombelList = [];
-
     fullData.forEach(row => {
-      const rombel = row[colIndex]?.trim();
-      if (rombel) rombelList.push(rombel);
+      if (row[colIndex]) {
+        const rombel = String(row[colIndex]).trim();
+        if (rombel) rombelList.push(rombel);
+      }
     });
 
-    rombelList = [...new Set(rombelList)].sort((a,b)=>a.localeCompare(b,'id'));
+    // Hilangkan duplikat dan sort
+    rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+
+    // 🚫 Hapus nilai header yang salah (seperti 'Rombel Saat Ini')
     rombelList = rombelList.filter(r => r.toLowerCase() !== "rombel saat ini");
 
-    if (!rombelList.length) {
-      document.getElementById("output").innerHTML = "<span style='color:red;'>❌ Kolom AQ tidak ditemukan!</span>";
+    if (rombelList.length === 0) {
+      document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom 'Rombel Saat Ini' (AQ) tidak ditemukan!</p>";
       return;
     }
 
-    document.getElementById("output").innerHTML = `
-      ✅ File berhasil dimuat!<br><br>
-      <label>Pilih Rombel:</label>
+    const selectHTML = `
+      <label for="rombelSelect">Pilih Rombel:</label>
       <select id="rombelSelect">
         <option value="">-- Pilih Rombel --</option>
         ${rombelList.map(r => `<option value="${r}">${r}</option>`).join("")}
       </select>
-      <button onclick="filterRombel()">Proses</button>
-      <button onclick="downloadExcel()">Download Semua</button>
+      <button onclick="filterRombel()">Proses Filter</button>
+      <button onclick="downloadExcel()">Download Excel</button>
+      <p style="margin-top:5px;color:#555;">Daftar Rombel Ditemukan (${rombelList.length}):<br>• ${rombelList.join("<br>• ")}</p>
     `;
+    document.getElementById("output").innerHTML = `<p>✅ File berhasil dimuat!</p>${selectHTML}`;
   };
-
   reader.readAsArrayBuffer(file);
 }
 
@@ -183,83 +132,33 @@ function filterRombel() {
     alert("Pilih rombel terlebih dahulu!");
     return;
   }
-
   const colIndex = 42;
-  filteredData = fullData.filter(row => (row[colIndex] || "").trim() === selectedRombel);
-
+  filteredData = fullData.filter(row => String(row[colIndex]).trim() === selectedRombel);
   displayTable(filteredData);
-  generateColumnCheckboxes();
 }
 
 function displayTable(data) {
-  let tableHTML = "<table><thead><tr>" +
-    headerRow.map(h => `<th>${h}</th>`).join("") +
-    "</tr></thead><tbody>";
-
+  if (data.length === 0) {
+    document.getElementById("tableContainer").innerHTML = "<p style='color:red;'>Tidak ada data untuk rombel ini.</p>";
+    return;
+  }
+  let tableHTML = "<table><thead><tr>" + headerRow.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
   data.forEach(row => {
-    tableHTML += "<tr>" + headerRow.map((_, i) =>
-      `<td>${row[i] || ""}</td>`).join("") + "</tr>";
+    tableHTML += "<tr>" + headerRow.map((_,i)=>`<td>${row[i] || ""}</td>`).join("") + "</tr>";
   });
-
   tableHTML += "</tbody></table>";
   document.getElementById("tableContainer").innerHTML = tableHTML;
 }
 
 function downloadExcel() {
-  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...filteredData]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Filter");
-  XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
-}
-
-function generateColumnCheckboxes() {
-  const box = document.getElementById("columnCheckboxes");
-  box.innerHTML = "";
-  document.getElementById("columnSelector").style.display = "block";
-
-  headerRow.forEach((col, i) => {
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = i;
-    if (["No", "Nama", "JK", "Alamat"].includes(col)) checkbox.checked = true;
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(" " + col));
-    box.appendChild(label);
-  });
-}
-
-function showSelectedColumns() {
-  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
-  const selectedIndexes = [...checked].map(cb => +cb.value);
-  const newHeader = selectedIndexes.map(i => headerRow[i]);
-  selectedData = filteredData.map(r => selectedIndexes.map(i => r[i] || ""));
-
-  let html = "<table><thead><tr>" +
-    newHeader.map(h => `<th>${h}</th>`).join("") +
-    "</tr></thead><tbody>";
-
-  selectedData.forEach(r => {
-    html += "<tr>" + r.map(v => `<td>${v}</td>`).join("") + "</tr>";
-  });
-
-  html += "</tbody></table>";
-  document.getElementById("filteredColumnsContainer").innerHTML = html;
-}
-
-function downloadSelectedColumns() {
-  if (!selectedData.length) {
-    alert("Tampilkan dulu kolom terpilih!");
+  if (!filteredData || filteredData.length === 0) {
+    alert("Tidak ada data untuk diunduh!");
     return;
   }
-  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
-  const selectedIndexes = [...checked].map(cb => +cb.value);
-  const newHeader = selectedIndexes.map(i => headerRow[i]);
-
-  const ws = XLSX.utils.aoa_to_sheet([newHeader, ...selectedData]);
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...filteredData]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Kolom Terpilih");
-  XLSX.writeFile(wb, "kolom_terpilih.xlsx");
+  XLSX.utils.book_append_sheet(wb, ws, "Hasil Filter");
+  XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
 }
 </script>
 
