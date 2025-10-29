@@ -61,6 +61,24 @@
     color: #555;
     font-style: italic;
   }
+  #columnSelector {
+    margin-top: 20px;
+    padding: 10px;
+    background: #eef3f7;
+    border-radius: 6px;
+  }
+  #columnSelector label {
+    display: inline-block;
+    margin-right: 10px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  #filteredColumnsContainer {
+    margin-top: 20px;
+  }
 </style>
 </head>
 <body>
@@ -71,10 +89,20 @@
 <div id="output"></div>
 <div id="tableContainer"></div>
 
+<!-- 🔽 Tambahan menu baru -->
+<div id="columnSelector" style="display:none;">
+  <h3>🔍 Pilih Kolom yang Ingin Ditampilkan</h3>
+  <div id="columnCheckboxes"></div>
+  <button onclick="showSelectedColumns()">Tampilkan Kolom Terpilih</button>
+  <button onclick="downloadSelectedColumns()">Download Kolom Terpilih (XLSX)</button>
+</div>
+<div id="filteredColumnsContainer"></div>
+
 <script>
 let fullData = [];
 let headerRow = [];
 let filteredData = [];
+let selectedData = [];
 
 document.getElementById("excelFile").addEventListener("change", handleFile, false);
 
@@ -102,8 +130,6 @@ function handleFile(e) {
 
     // Hilangkan duplikat dan sort
     rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
-
-    // 🚫 Hapus nilai header yang salah (seperti 'Rombel Saat Ini')
     rombelList = rombelList.filter(r => r.toLowerCase() !== "rombel saat ini");
 
     if (rombelList.length === 0) {
@@ -135,6 +161,9 @@ function filterRombel() {
   const colIndex = 42;
   filteredData = fullData.filter(row => String(row[colIndex]).trim() === selectedRombel);
   displayTable(filteredData);
+  
+  // 🔥 Tampilkan menu kolom baru
+  generateColumnCheckboxes();
 }
 
 function displayTable(data) {
@@ -159,6 +188,57 @@ function downloadExcel() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Hasil Filter");
   XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
+}
+
+// --- 🔽 Fitur baru: Pilih kolom ---
+function generateColumnCheckboxes() {
+  const container = document.getElementById("columnCheckboxes");
+  container.innerHTML = "";
+  document.getElementById("columnSelector").style.display = "block";
+  headerRow.forEach((col, i) => {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = i;
+    if (["No", "Nama", "JK", "Alamat"].includes(col)) checkbox.checked = true; // default
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(" " + col));
+    container.appendChild(label);
+  });
+}
+
+// --- 🔽 Tampilkan kolom terpilih ---
+function showSelectedColumns() {
+  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
+  if (checked.length === 0) {
+    alert("Pilih minimal satu kolom!");
+    return;
+  }
+  const selectedIndexes = Array.from(checked).map(cb => parseInt(cb.value));
+  const newHeader = selectedIndexes.map(i => headerRow[i]);
+  selectedData = filteredData.map(row => selectedIndexes.map(i => row[i] || ""));
+  
+  let html = "<table><thead><tr>" + newHeader.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
+  selectedData.forEach(row => {
+    html += "<tr>" + row.map(v => `<td>${v}</td>`).join("") + "</tr>";
+  });
+  html += "</tbody></table>";
+  document.getElementById("filteredColumnsContainer").innerHTML = html;
+}
+
+// --- 🔽 Download kolom terpilih ---
+function downloadSelectedColumns() {
+  if (!selectedData.length) {
+    alert("Belum ada data kolom terpilih untuk diunduh!");
+    return;
+  }
+  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
+  const selectedIndexes = Array.from(checked).map(cb => parseInt(cb.value));
+  const newHeader = selectedIndexes.map(i => headerRow[i]);
+  const ws = XLSX.utils.aoa_to_sheet([newHeader, ...selectedData]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Kolom Terpilih");
+  XLSX.writeFile(wb, "hasil_kolom_terpilih.xlsx");
 }
 </script>
 
