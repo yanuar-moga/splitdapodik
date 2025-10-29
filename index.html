@@ -1,112 +1,166 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Filter & Sort Data - SMPN 1 Moga (v3)</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi Filter Data Dapodik per Rombel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 30px;
+    background: #f9fafb;
+    color: #222;
+  }
+  h1 {
+    font-size: 22px;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h1::before {
+    content: "📊";
+  }
+  label {
+    font-weight: 600;
+    margin-right: 5px;
+  }
+  input[type="file"], select, button {
+    margin: 5px 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+  }
+  button {
+    background: #3498db;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #2980b9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    text-align: left;
+  }
+  th {
+    background: #eef3f7;
+  }
+  .loading {
+    color: #555;
+    font-style: italic;
+  }
+</style>
 </head>
-<body class="bg-light">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">Data Siswa - SMPN 1 Moga (v3)</a>
-    </div>
-  </nav>
+<body>
 
-  <div class="container">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card mb-3">
-          <div class="card-body">
-            <h5 class="card-title">Upload / Sumber Data (Header row ke-6 otomatis)</h5>
-            <div class="mb-2">
-              <input type="file" id="fileInput" class="form-control" accept=".xlsx,.xls,.csv">
-            </div>
-            <div class="mb-2">
-              <button id="loadFileBtn" class="btn btn-primary w-100">Load File</button>
-            </div>
-            <div class="mb-2 text-muted small">Sistem otomatis membaca header di <strong>baris 6</strong> (A6 = No, B6 = Nama, ...).</div>
-            <hr>
-            <h5 class="card-title">Pilih kolom</h5>
-            <div class="mb-2">
-              <button id="selectAllBtn" class="btn btn-sm btn-outline-secondary">Pilih Semua</button>
-              <button id="deselectAllBtn" class="btn btn-sm btn-outline-secondary">Reset Pilihan</button>
-            </div>
-            <form id="columnsForm" class="mb-2">
-              <div id="columnsCheckboxes" class="mb-2" style="max-height:300px; overflow:auto;"></div>
-              <div class="mb-2">
-                <input type="text" id="searchCols" class="form-control" placeholder="Cari kolom...">
-              </div>
-              <div class="d-grid gap-2">
-                <button type="button" id="processBtn" class="btn btn-success">Proses</button>
-                <button type="button" id="clearDataBtn" class="btn btn-outline-danger">Hapus Data Upload</button>
-              </div>
-            </form>
+<h1>Aplikasi Filter Data Dapodik per Rombel</h1>
 
-            <hr>
-            <h6>Fitur tambahan</h6>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="enableSearch" checked>
-              <label class="form-check-label" for="enableSearch">Tampilkan search bar</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="enableExport" checked>
-              <label class="form-check-label" for="enableExport">Enable export XLSX</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="enableSort" checked>
-              <label class="form-check-label" for="enableSort">Enable sort by header</label>
-            </div>
+<input type="file" id="excelFile" accept=".xlsx, .xls" />
+<div id="output"></div>
+<div id="tableContainer"></div>
 
-            <hr>
-            <small class="text-muted">Data diproses di browser. File tidak dikirim ke server.</small>
-          </div>
-        </div>
+<script>
+let fullData = [];
+let headerRow = [];
+let filteredData = [];
 
-        <div class="card">
-          <div class="card-body">
-            <h6>Export / Unduh</h6>
-            <div class="d-grid gap-2">
-              <a id="downloadFilteredBtn" class="btn btn-primary" href="#" style="display:none;">Unduh hasil filter (.xlsx)</a>
-            </div>
-          </div>
-        </div>
+document.getElementById("excelFile").addEventListener("change", handleFile, false);
 
-      </div>
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  document.getElementById("output").innerHTML = "<p class='loading'>⏳ Membaca file Excel...</p>";
+  reader.onload = function (e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    headerRow = json[4]; // karena baris ke-5 adalah header sebenarnya
+    fullData = json.slice(5); // data mulai dari baris ke-6
+    const colIndex = 42; // kolom AQ = Rombel Saat Ini
+    let rombelList = [];
+    fullData.forEach(row => {
+      if (row[colIndex]) {
+        const rombel = String(row[colIndex]).trim();
+        if (rombel) rombelList.push(rombel);
+      }
+    });
 
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-body">
-            <div id="toolbar" class="mb-2" style="display:none;">
-              <div class="row g-2">
-                <div class="col">
-                  <input id="globalSearch" class="form-control" placeholder="Cari data (nama, no, ... )">
-                </div>
-                <div class="col-auto">
-                  <button id="clearSearch" class="btn btn-sm btn-outline-secondary">Clear</button>
-                </div>
-              </div>
-            </div>
+    // Hilangkan duplikat dan sort
+    rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
 
-            <div class="table-responsive">
-              <table id="resultTable" class="table table-striped table-bordered table-sm">
-                <thead id="resultHead"></thead>
-                <tbody id="resultBody"></tbody>
-              </table>
-            </div>
+    // 🚫 Hapus nilai header yang salah (seperti 'Rombel Saat Ini')
+    rombelList = rombelList.filter(r => r.toLowerCase() !== "rombel saat ini");
 
-            <div id="status" class="mt-2 text-muted"></div>
-          </div>
-        </div>
-      </div>
+    if (rombelList.length === 0) {
+      document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom 'Rombel Saat Ini' (AQ) tidak ditemukan!</p>";
+      return;
+    }
 
-    </div>
-  </div>
+    const selectHTML = `
+      <label for="rombelSelect">Pilih Rombel:</label>
+      <select id="rombelSelect">
+        <option value="">-- Pilih Rombel --</option>
+        ${rombelList.map(r => `<option value="${r}">${r}</option>`).join("")}
+      </select>
+      <button onclick="filterRombel()">Proses Filter</button>
+      <button onclick="downloadExcel()">Download Excel</button>
+      <p style="margin-top:5px;color:#555;">Daftar Rombel Ditemukan (${rombelList.length}):<br>• ${rombelList.join("<br>• ")}</p>
+    `;
+    document.getElementById("output").innerHTML = `<p>✅ File berhasil dimuat!</p>${selectHTML}`;
+  };
+  reader.readAsArrayBuffer(file);
+}
 
-<!-- SheetJS for Excel parsing and writing, PapaParse for CSV -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="script_v3.js"></script>
+function filterRombel() {
+  const selectedRombel = document.getElementById("rombelSelect").value;
+  if (!selectedRombel) {
+    alert("Pilih rombel terlebih dahulu!");
+    return;
+  }
+  const colIndex = 42;
+  filteredData = fullData.filter(row => String(row[colIndex]).trim() === selectedRombel);
+  displayTable(filteredData);
+}
+
+function displayTable(data) {
+  if (data.length === 0) {
+    document.getElementById("tableContainer").innerHTML = "<p style='color:red;'>Tidak ada data untuk rombel ini.</p>";
+    return;
+  }
+  let tableHTML = "<table><thead><tr>" + headerRow.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
+  data.forEach(row => {
+    tableHTML += "<tr>" + headerRow.map((_,i)=>`<td>${row[i] || ""}</td>`).join("") + "</tr>";
+  });
+  tableHTML += "</tbody></table>";
+  document.getElementById("tableContainer").innerHTML = tableHTML;
+}
+
+function downloadExcel() {
+  if (!filteredData || filteredData.length === 0) {
+    alert("Tidak ada data untuk diunduh!");
+    return;
+  }
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...filteredData]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Hasil Filter");
+  XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
+}
+</script>
+
 </body>
 </html>
