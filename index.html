@@ -1,245 +1,675 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aplikasi Filter Data Dapodik per Rombel</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Excel Dapodik Splitter</title>
+
+<!-- XLSX -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- jsPDF + html2canvas untuk export PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
-  body {
-    font-family: "Segoe UI", Arial, sans-serif;
-    margin: 30px;
-    background: #f9fafb;
-    color: #222;
+  :root{
+    --bg:#f9fafb; --card:#fff; --text:#222; --muted:#555; --accent:#3498db;
   }
-  h1 {
-    font-size: 22px;
-    color: #2c3e50;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  [data-theme="dark"]{
+    --bg:#0f1720; --card:#0b1320; --text:#e6eef8; --muted:#9aa7bd; --accent:#3ea3ff;
   }
-  h1::before {
-    content: "📊";
+  *{box-sizing:border-box}
+  body{
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    margin:0;padding:18px;background:var(--bg);color:var(--text);
   }
-  label {
-    font-weight: 600;
-    margin-right: 5px;
-  }
-  input[type="file"], select, button {
-    margin: 5px 0;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    font-size: 14px;
-  }
-  button {
-    background: #3498db;
-    color: white;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-  button:hover {
-    background: #2980b9;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-    background: white;
-    box-shadow: 0 0 5px rgba(0,0,0,0.1);
-  }
-  th, td {
-    border: 1px solid #ccc;
-    padding: 6px 10px;
-    text-align: left;
-  }
-  th {
-    background: #eef3f7;
-  }
-  .loading {
-    color: #555;
-    font-style: italic;
-  }
-  #columnSelector {
-    margin-top: 20px;
-    padding: 10px;
-    background: #eef3f7;
-    border-radius: 6px;
-  }
-  #columnSelector label {
-    display: inline-block;
-    margin-right: 10px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 4px 8px;
-    cursor: pointer;
-  }
-  #filteredColumnsContainer {
-    margin-top: 20px;
+  .container{max-width:1200px;margin:0 auto}
+  header{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+  header img{height:56px;width:56px;border-radius:8px;object-fit:cover;border:1px solid rgba(0,0,0,0.06)}
+  h1{font-size:20px;margin:0}
+  .meta{font-size:13px;color:var(--muted);margin-top:3px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0;align-items:center}
+  input[type=file], select, button{padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.12);font-size:14px}
+  button{background:var(--accent);color:#fff;border:none;cursor:pointer}
+  .small{font-size:13px;padding:6px 8px}
+  .progress{height:8px;background:rgba(0,0,0,0.06);border-radius:6px;overflow:hidden;width:100%;max-width:420px}
+  .bar{height:100%;background:linear-gradient(90deg,var(--accent),#2b8ad6);width:0%}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:900px){ .grid{grid-template-columns: 360px 1fr} }
+  .card{background:var(--card);padding:12px;border-radius:10px;box-shadow: 0 6px 18px rgba(0,0,0,0.03)}
+  #rombelSelect{min-width:260px}
+  .multi{min-height:38px;padding:6px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)}
+  .tables{margin-top:12px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  th,td{border:1px solid rgba(0,0,0,0.06);padding:6px 8px;text-align:left}
+  th{position:relative;background:rgba(0,0,0,0.03);cursor:pointer;user-select:none}
+  th .sort{position:absolute;right:6px;top:6px;font-size:11px;color:var(--muted)}
+  .filterDropdown{position:absolute;left:6px;top:6px;background:#fff;border:1px solid #ddd;padding:6px;border-radius:6px;z-index:40;max-height:220px;overflow:auto}
+  .filterDropdown input{width:100%;margin-bottom:6px;padding:6px}
+  .bottom-section{margin-top:18px}
+  .cols-area{margin-top:12px}
+  .cols-area table th{background:#eef3f7}
+  .shortFilters{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .shortFilters input{padding:6px;border-radius:6px;border:1px solid #ddd}
+  footer{margin-top:20px;text-align:center;color:var(--muted);font-size:13px}
+  .tog{display:flex;align-items:center;gap:8px}
+  .chip{background:rgba(0,0,0,0.04);padding:6px 8px;border-radius:8px;font-size:13px}
+  /* responsive small screens */
+  @media(max-width:600px){
+    header img{height:48px;width:48px}
+    .controls{flex-direction:column;align-items:stretch}
+    .grid{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 
-<h1>Aplikasi Filter Data Dapodik per Rombel</h1>
+<div class="container" id="app">
+  <header>
+    <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjyxUJx7niMdG-f-iOxaI2uhnRbDLkSY1SNZhZNt7FMRPWiyrFq_WbRHhHCBqz_1K1kK4E9DoTjwZc8hi7um6UxgJRCxX99Orse05vW3SSZst7BjPdA6qPyzy0Jq7oOhC1S9KYq2RKZ6vAhnJA0GkfHK2LUK-2hclQEmP8hzjGKz_h4fLASHl5GOvfs4o0/s722/mb.jpg" alt="Logo Sekolah">
+    <div>
+      <h1>Excel Dapodik Splitter</h1>
+      <div class="meta">Develop by <strong>MB</strong> · Version Aplikasi <strong>1.0</strong> (Build <strong>29 Oktober 2025</strong>)</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div class="tog">
+        <label class="chip" id="themeLabel">Light Mode</label>
+      </div>
+      <button class="small" id="toggleThemeBtn">Toggle Theme</button>
+    </div>
+  </header>
 
-<input type="file" id="excelFile" accept=".xlsx, .xls" />
-<div id="output"></div>
-<div id="tableContainer"></div>
+  <div class="controls card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="excelFile" accept=".xlsx,.xls" />
+      <div style="min-width:220px;">
+        <label for="rombelSelect" style="display:block;margin-bottom:6px;font-weight:600">Pilih Rombel (Multi-select)</label>
+        <select id="rombelSelect" multiple class="multi" size="4"></select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button id="processBtn" class="small">Proses Filter</button>
+        <button id="downloadAllBtn" class="small">Download Semua Hasil (XLSX)</button>
+      </div>
+    </div>
 
-<!-- 🔽 Tambahan menu baru -->
-<div id="columnSelector" style="display:none;">
-  <h3>🔍 Pilih Kolom yang Ingin Ditampilkan</h3>
-  <div id="columnCheckboxes"></div>
-  <button onclick="showSelectedColumns()">Tampilkan Kolom Terpilih</button>
-  <button onclick="downloadSelectedColumns()">Download Kolom Terpilih (XLSX)</button>
+    <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="width:320px">
+        <div style="font-size:13px;color:var(--muted)">Progress</div>
+        <div class="progress"><div class="bar" id="progressBar"></div></div>
+      </div>
+
+      <div style="font-size:13px;color:var(--muted)">
+        <span id="countInfo">File belum dimuat</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="leftPanel">
+      <h3 style="margin-top:0">Pengaturan Kolom & Pilihan</h3>
+      <div id="colSelectorArea">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Pilih kolom yang ingin ditampilkan untuk setiap tabel (Kolom <strong>No</strong> akan selalu tampil otomatis).</div>
+        <div id="columnCheckboxes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="applyCols" class="small">Tampilkan Kolom Terpilih</button>
+          <button id="downloadCols" class="small">Download Kolom Terpilih (XLSX)</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-weight:600;margin-bottom:6px">Export PDF</div>
+        <button id="exportPdfBtn" class="small">Export Semua Tabel ke PDF</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-weight:600;margin-bottom:6px">Quick Actions</div>
+        <button id="clearBtn" class="small">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="tablesArea" class="tables"></div>
+      <div class="bottom-section">
+        <h3 style="margin-bottom:6px">Kolom Terpilih — Short Filter per Header</h3>
+        <div id="selectedColsArea" class="cols-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Excel Dapodik Splitter — Develop by <strong>MB</strong><br>
+    Version Aplikasi <strong>1.0</strong> (Build <strong>29 Oktober 2025</strong>)
+  </footer>
 </div>
-<div id="filteredColumnsContainer"></div>
 
 <script>
-let fullData = [];
-let headerRow = [];
-let filteredData = [];
-let selectedData = [];
+/* ---------- Globals & assumptions ---------- */
+/*
+  - Skip 6 first rows (index 0..5). Header = row index 4 (baris ke-5).
+  - Data starts from row index 5 (baris ke-6) per Anda sebelumnya.
+  - Kolom AQ -> index 42 (0-based).
+*/
+const ROMBEL_COL_INDEX = 42;
+let workbookData = []; // full sheet array-of-arrays after slice
+let headerRow = []; // headerRow = json[4]
+let rawAllRows = []; // original full json
+let selectedColumnsIdx = []; // indexes chosen by user
+let filteredByRombel = {}; // { rombelName: rows[] }
+let currentTheme = 'light';
 
-document.getElementById("excelFile").addEventListener("change", handleFile, false);
+const fileInput = document.getElementById('excelFile');
+const rombelSelect = document.getElementById('rombelSelect');
+const processBtn = document.getElementById('processBtn');
+const downloadAllBtn = document.getElementById('downloadAllBtn');
+const progressBar = document.getElementById('progressBar');
+const countInfo = document.getElementById('countInfo');
+const columnCheckboxes = document.getElementById('columnCheckboxes');
+const applyColsBtn = document.getElementById('applyCols');
+const downloadColsBtn = document.getElementById('downloadCols');
+const tablesArea = document.getElementById('tablesArea');
+const selectedColsArea = document.getElementById('selectedColsArea');
+const clearBtn = document.getElementById('clearBtn');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
+const toggleThemeBtn = document.getElementById('toggleThemeBtn');
+const themeLabel = document.getElementById('themeLabel');
 
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+/* ---------- Helper functions ---------- */
+function setProgress(p){ progressBar.style.width = Math.max(0,Math.min(100,p))+'%'; }
+function toText(v){ return v == null ? '' : String(v); }
+function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id')); }
+
+/* ---------- File read ---------- */
+fileInput.addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  resetAll();
   const reader = new FileReader();
-  document.getElementById("output").innerHTML = "<p class='loading'>⏳ Membaca file Excel...</p>";
-  reader.onload = function (e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    headerRow = json[4]; // karena baris ke-5 adalah header sebenarnya
-    fullData = json.slice(5); // data mulai dari baris ke-6
-    const colIndex = 42; // kolom AQ = Rombel Saat Ini
-    let rombelList = [];
-    fullData.forEach(row => {
-      if (row[colIndex]) {
-        const rombel = String(row[colIndex]).trim();
-        if (rombel) rombelList.push(rombel);
-      }
-    });
-
-    // Hilangkan duplikat dan sort
-    rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
-    rombelList = rombelList.filter(r => r.toLowerCase() !== "rombel saat ini");
-
-    if (rombelList.length === 0) {
-      document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom 'Rombel Saat Ini' (AQ) tidak ditemukan!</p>";
-      return;
+  reader.onprogress = function(e){
+    if(e.lengthComputable){
+      const percent = Math.round((e.loaded / e.total) * 70); // up to 70% for read
+      setProgress(percent);
     }
-
-    const selectHTML = `
-      <label for="rombelSelect">Pilih Rombel:</label>
-      <select id="rombelSelect">
-        <option value="">-- Pilih Rombel --</option>
-        ${rombelList.map(r => `<option value="${r}">${r}</option>`).join("")}
-      </select>
-      <button onclick="filterRombel()">Proses Filter</button>
-      <button onclick="downloadExcel()">Download Excel</button>
-      <p style="margin-top:5px;color:#555;">Daftar Rombel Ditemukan (${rombelList.length}):<br>• ${rombelList.join("<br>• ")}</p>
-    `;
-    document.getElementById("output").innerHTML = `<p>✅ File berhasil dimuat!</p>${selectHTML}`;
+  };
+  reader.onload = function(e){
+    setProgress(80);
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, {type:'array'});
+    const sheetName = wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(ws, { header:1, raw:false });
+    // Save rawAllRows for reference
+    rawAllRows = json;
+    headerRow = json[4] || [];         // baris ke-5
+    workbookData = json.slice(5);      // data mulai baris ke-6
+    setProgress(95);
+    buildRombelOptions();
+    populateColumnCheckboxes();
+    countInfo.innerText = `File dimuat — baris data: ${workbookData.length}`;
+    setProgress(100);
+    setTimeout(()=>setProgress(0),400);
   };
   reader.readAsArrayBuffer(file);
-}
+});
 
-function filterRombel() {
-  const selectedRombel = document.getElementById("rombelSelect").value;
-  if (!selectedRombel) {
-    alert("Pilih rombel terlebih dahulu!");
-    return;
-  }
-  const colIndex = 42;
-  filteredData = fullData.filter(row => String(row[colIndex]).trim() === selectedRombel);
-  displayTable(filteredData);
-  
-  // 🔥 Tampilkan menu kolom baru
-  generateColumnCheckboxes();
-}
-
-function displayTable(data) {
-  if (data.length === 0) {
-    document.getElementById("tableContainer").innerHTML = "<p style='color:red;'>Tidak ada data untuk rombel ini.</p>";
-    return;
-  }
-  let tableHTML = "<table><thead><tr>" + headerRow.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
-  data.forEach(row => {
-    tableHTML += "<tr>" + headerRow.map((_,i)=>`<td>${row[i] || ""}</td>`).join("") + "</tr>";
+/* ---------- Build Rombel multi-select options ---------- */
+function buildRombelOptions(){
+  const setR = new Set();
+  workbookData.forEach(row => {
+    const v = toText(row[ROMBEL_COL_INDEX]).trim();
+    if(v && v.toLowerCase() !== 'rombel saat ini') setR.add(v);
   });
-  tableHTML += "</tbody></table>";
-  document.getElementById("tableContainer").innerHTML = tableHTML;
+  const arr = [...setR].sort((a,b)=>a.localeCompare(b,'id'));
+  rombelSelect.innerHTML = '';
+  arr.forEach(r=>{
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    rombelSelect.appendChild(opt);
+  });
+  if(arr.length===0){
+    countInfo.innerHTML = '⚠️ Rombel (kolom AQ) tidak ditemukan atau kosong.';
+  }
 }
 
-function downloadExcel() {
-  if (!filteredData || filteredData.length === 0) {
-    alert("Tidak ada data untuk diunduh!");
-    return;
+/* ---------- Column selector UI (checkboxes) ---------- */
+function populateColumnCheckboxes(){
+  columnCheckboxes.innerHTML = '';
+  // Ensure "No" column shown as always present
+  // If headerRow missing, create placeholder columns up to 60
+  const headers = headerRow.length ? headerRow : Array.from({length:60}).map((_,i)=>'Kolom '+(i+1));
+  headers.forEach((h,i)=>{
+    // always include No as virtual col index -1
+    const id = 'colcb_'+i;
+    const label = document.createElement('label');
+    label.style.display='inline-block';
+    label.style.margin='4px';
+    label.style.padding='6px 8px';
+    label.style.border='1px solid rgba(0,0,0,0.06)';
+    label.style.borderRadius='8px';
+    const input = document.createElement('input');
+    input.type='checkbox';
+    input.value = i;
+    input.id = id;
+    // default check some common columns if names found
+    const lower = String(h).toLowerCase();
+    if(/\b(nama|nama lengkap|nama_siswa)\b/.test(lower) || /\b(jk|kelamin)\b/.test(lower) || /\b(alamat)\b/.test(lower)) input.checked = true;
+    // Create label
+    label.appendChild(input);
+    const txt = document.createTextNode(' ' + (h || ('Kolom '+(i+1))));
+    label.appendChild(txt);
+    columnCheckboxes.appendChild(label);
+  });
+  // Ensure "No" shown as always (we'll treat it as generated)
+  const noChip = document.createElement('div');
+  noChip.className='chip';
+  noChip.style.marginTop='8px';
+  noChip.innerText = 'Kolom No akan selalu tampil (auto-number)';
+  columnCheckboxes.appendChild(noChip);
+}
+
+/* ---------- Process Button (filter per rombel) ---------- */
+processBtn.addEventListener('click', ()=>{
+  const selectedOptions = Array.from(rombelSelect.selectedOptions).map(o=>o.value);
+  if(!selectedOptions.length){ alert('Pilih minimal 1 rombel (Ctrl/Cmd + klik untuk multi).'); return; }
+  // build filteredByRombel object
+  filteredByRombel = {};
+  selectedOptions.forEach(r=>{
+    const rows = workbookData.filter(row => toText(row[ROMBEL_COL_INDEX]).trim() === r);
+    filteredByRombel[r] = rows;
+  });
+  renderAllTables();
+});
+
+/* ---------- Render tables per rombel (Choice B: separate) ---------- */
+function renderAllTables(){
+  tablesArea.innerHTML = '';
+  const chosenIdx = getSelectedColumnIndexes();
+  selectedColumnsIdx = chosenIdx; // record chosen columns
+  for(const rombel of Object.keys(filteredByRombel)){
+    const rows = filteredByRombel[rombel];
+    const box = document.createElement('div');
+    box.style.marginBottom = '18px';
+    const title = document.createElement('h3');
+    title.style.margin='6px 0';
+    title.textContent = rombel + ` — (${rows.length} siswa)`;
+    box.appendChild(title);
+
+    // Build table container with filter UI
+    const tblContainer = document.createElement('div');
+    tblContainer.className = 'tableBlock';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+
+    // Build header cells with sort & filter
+    // We will include "No" as first column (virtual)
+    const headers = ['No', ...selectedColumnsIdx.map(i=>headerRow[i] || ('Kolom '+(i+1)))];
+
+    headers.forEach((h, hi)=>{
+      const th = document.createElement('th');
+      th.textContent = h;
+      // add sort indicator
+      const sortSpan = document.createElement('span');
+      sortSpan.className='sort';
+      sortSpan.textContent = '⇅';
+      th.appendChild(sortSpan);
+
+      // attach click sorting
+      th.addEventListener('click', ()=>{
+        const keyIndex = hi-1; // because 0 is No
+        // if No clicked, sort by generated number => ignore
+        if(hi===0) return;
+        // toggle sort state stored in DOM
+        const dir = th.dataset.sort === 'asc' ? 'desc' : 'asc';
+        // clear previous sort markers on this header row
+        thead.querySelectorAll('th').forEach(x=>x.dataset.sort='');
+        th.dataset.sort = dir;
+        sortTableByColumn(table, keyIndex, dir);
+      });
+
+      // create filter button (dropdown) at left
+      const filterBtn = document.createElement('button');
+      filterBtn.textContent = '🔽';
+      filterBtn.style.marginLeft = '8px';
+      filterBtn.style.fontSize='11px';
+      filterBtn.className='small';
+      filterBtn.onclick = (ev)=>{
+        ev.stopPropagation();
+        openFilterDropdown(ev.currentTarget, hi, rombel, table, rows);
+      };
+      th.appendChild(filterBtn);
+
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    // initial rendering of rows
+    rows.forEach((row, idx)=>{
+      const trd = document.createElement('tr');
+      const noTd = document.createElement('td');
+      noTd.textContent = idx+1;
+      trd.appendChild(noTd);
+      selectedColumnsIdx.forEach(i=>{
+        const td = document.createElement('td');
+        td.innerText = row[i] || '';
+        trd.appendChild(td);
+      });
+      tbody.appendChild(trd);
+    });
+    table.appendChild(tbody);
+    tblContainer.appendChild(table);
+    box.appendChild(tblContainer);
+    tablesArea.appendChild(box);
+
+    // add small actions per rombel
+    const actionRow = document.createElement('div');
+    actionRow.style.marginTop='6px';
+    actionRow.style.display='flex';
+    actionRow.style.gap='8px';
+    const dlBtn = document.createElement('button');
+    dlBtn.className='small';
+    dlBtn.textContent = 'Download XLSX ('+rombel+')';
+    dlBtn.onclick = ()=>downloadXlsxForRombel(rombel);
+    actionRow.appendChild(dlBtn);
+    box.appendChild(actionRow);
   }
-  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...filteredData]);
+
+  // update bottom selected columns area
+  renderSelectedColsArea();
+}
+
+/* ---------- Sorting function ---------- */
+function sortTableByColumn(table, keyIndex, dir){
+  // keyIndex corresponds to selectedColumnsIdx array index (0..)
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a,b)=>{
+    const ac = a.children[keyIndex+1]?.innerText || '';
+    const bc = b.children[keyIndex+1]?.innerText || '';
+    // numeric compare if both numeric
+    const an = parseFloat(ac.replace(/,/g,'')), bn = parseFloat(bc.replace(/,/g,''));
+    if(!isNaN(an) && !isNaN(bn)) return dir==='asc' ? an - bn : bn - an;
+    return dir==='asc' ? ac.localeCompare(bc,'id') : bc.localeCompare(ac,'id');
+  });
+  // re-append rows and fix No col numbering
+  rows.forEach((r, i)=>{ r.children[0].innerText = i+1; tbody.appendChild(r); });
+}
+
+/* ---------- Filter dropdown per header ---------- */
+function openFilterDropdown(button, headerIndex, rombel, table, rows){
+  // headerIndex is index in displayed headers (0=No)
+  // if filter already open remove it
+  closeAllDropdowns();
+  const dropdown = document.createElement('div');
+  dropdown.className='filterDropdown';
+  const inputSearch = document.createElement('input');
+  inputSearch.placeholder = 'Cari nilai...';
+  dropdown.appendChild(inputSearch);
+
+  // build list of unique values for this column for the given rombel
+  // headerIndex 0 = No -> nothing to filter
+  if(headerIndex === 0){
+    const p = document.createElement('div'); p.innerText = 'Kolom No tidak dapat difilter.'; dropdown.appendChild(p);
+  } else {
+    const colIdx = selectedColumnsIdx[headerIndex-1];
+    const vals = uniqueSorted(rows.map(r=>toText(r[colIdx]).trim()));
+    // add checkboxes for values
+    vals.forEach(v=>{
+      const lab = document.createElement('label');
+      lab.style.display='block'; lab.style.marginBottom='4px';
+      const cb = document.createElement('input');
+      cb.type='checkbox'; cb.value = v; cb.checked = true;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(' ' + v));
+      dropdown.appendChild(lab);
+    });
+
+    // include select all / clear
+    const allBtn = document.createElement('button'); allBtn.textContent='Pilih Semua'; allBtn.className='small';
+    allBtn.onclick = ()=>{ dropdown.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=true); };
+    const clearBtn = document.createElement('button'); clearBtn.textContent='Bersihkan'; clearBtn.className='small';
+    clearBtn.onclick = ()=>{ dropdown.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false); };
+    dropdown.appendChild(allBtn); dropdown.appendChild(clearBtn);
+
+    const applyBtn = document.createElement('button'); applyBtn.textContent='Apply'; applyBtn.className='small';
+    applyBtn.onclick = ()=>{
+      // collect checked values
+      const allowed = Array.from(dropdown.querySelectorAll('input[type=checkbox]')).filter(x=>x.checked).map(x=>x.value);
+      applyColumnFilterToTable(table, headerIndex-1, allowed);
+      dropdown.remove();
+    };
+    dropdown.appendChild(applyBtn);
+
+    // filter values in dropdown by typing
+    inputSearch.oninput = ()=>{
+      const q = inputSearch.value.toLowerCase();
+      Array.from(dropdown.querySelectorAll('label')).forEach(l=>{
+        const txt = l.innerText.toLowerCase();
+        l.style.display = txt.indexOf(q) === -1 ? 'none' : 'block';
+      });
+    };
+  }
+
+  // position dropdown under button
+  document.body.appendChild(dropdown);
+  const rect = button.getBoundingClientRect();
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  // close when clicking outside
+  setTimeout(()=>{ window.addEventListener('click', closeAllDropdowns); }, 50);
+}
+function closeAllDropdowns(){ document.querySelectorAll('.filterDropdown').forEach(d=>d.remove()); window.removeEventListener('click', closeAllDropdowns); }
+
+/* ---------- Apply filter to table rows by allowed values for a column ---------- */
+function applyColumnFilterToTable(table, colIdxInSelected, allowedValues){
+  const tbody = table.querySelector('tbody');
+  const allRows = Array.from(tbody.querySelectorAll('tr'));
+  allRows.forEach((tr,i)=>{
+    const cell = tr.children[colIdxInSelected+1]; // +1 because No is first
+    const val = (cell && cell.innerText) ? cell.innerText : '';
+    const show = allowedValues.includes(val);
+    tr.style.display = show ? '' : 'none';
+  });
+  // re-number No column based on visible rows
+  let n=0; allRows.forEach(tr=>{ if(tr.style.display !== 'none'){ n++; tr.children[0].innerText = n; } });
+}
+
+/* ---------- Get selected columns index array ---------- */
+function getSelectedColumnIndexes(){
+  const checks = Array.from(columnCheckboxes.querySelectorAll('input[type=checkbox]'));
+  const idxs = checks.filter(c=>c.checked).map(c=>parseInt(c.value));
+  // ensure always include ROMBEL_COL_INDEX? Not necessary unless user wants
+  return idxs;
+}
+
+/* ---------- Download XLSX for a rombel ---------- */
+function downloadXlsxForRombel(rombel){
+  const rows = filteredByRombel[rombel] || [];
+  if(!rows.length){ alert('Tidak ada data.'); return; }
+  const idxs = selectedColumnsIdx;
+  const hdr = ['No', ...idxs.map(i=>headerRow[i]||('Kolom '+(i+1)))];
+  const aoa = [hdr];
+  rows.forEach((r,ri)=>{
+    const line = [ri+1, ...idxs.map(i=>r[i] || '')];
+    aoa.push(line);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Hasil Filter");
-  XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
+  XLSX.utils.book_append_sheet(wb, ws, rombel);
+  XLSX.writeFile(wb, `${rombel.replace(/[\\/:*?"<>|]/g,'_')}_hasil.xlsx`);
 }
 
-// --- 🔽 Fitur baru: Pilih kolom ---
-function generateColumnCheckboxes() {
-  const container = document.getElementById("columnCheckboxes");
-  container.innerHTML = "";
-  document.getElementById("columnSelector").style.display = "block";
-  headerRow.forEach((col, i) => {
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = i;
-    if (["No", "Nama", "JK", "Alamat"].includes(col)) checkbox.checked = true; // default
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(" " + col));
-    container.appendChild(label);
-  });
-}
-
-// --- 🔽 Tampilkan kolom terpilih ---
-function showSelectedColumns() {
-  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
-  if (checked.length === 0) {
-    alert("Pilih minimal satu kolom!");
-    return;
-  }
-  const selectedIndexes = Array.from(checked).map(cb => parseInt(cb.value));
-  const newHeader = selectedIndexes.map(i => headerRow[i]);
-  selectedData = filteredData.map(row => selectedIndexes.map(i => row[i] || ""));
-  
-  let html = "<table><thead><tr>" + newHeader.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
-  selectedData.forEach(row => {
-    html += "<tr>" + row.map(v => `<td>${v}</td>`).join("") + "</tr>";
-  });
-  html += "</tbody></table>";
-  document.getElementById("filteredColumnsContainer").innerHTML = html;
-}
-
-// --- 🔽 Download kolom terpilih ---
-function downloadSelectedColumns() {
-  if (!selectedData.length) {
-    alert("Belum ada data kolom terpilih untuk diunduh!");
-    return;
-  }
-  const checked = document.querySelectorAll("#columnCheckboxes input:checked");
-  const selectedIndexes = Array.from(checked).map(cb => parseInt(cb.value));
-  const newHeader = selectedIndexes.map(i => headerRow[i]);
-  const ws = XLSX.utils.aoa_to_sheet([newHeader, ...selectedData]);
+/* ---------- Download ALL rombel combined XLSX ---------- */
+downloadAllBtn.addEventListener('click', ()=>{
+  if(!Object.keys(filteredByRombel).length){ alert('Tidak ada data yang diproses.'); return; }
+  // We'll create a workbook with each rombel as separate sheet
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Kolom Terpilih");
-  XLSX.writeFile(wb, "hasil_kolom_terpilih.xlsx");
+  const idxs = selectedColumnsIdx;
+  for(const rombel of Object.keys(filteredByRombel)){
+    const rows = filteredByRombel[rombel];
+    const hdr = ['No', ...idxs.map(i=>headerRow[i]||('Kolom '+(i+1)))];
+    const aoa = [hdr];
+    rows.forEach((r,ri)=> aoa.push([ri+1, ...idxs.map(i=>r[i] || '')]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, rombel.substring(0,30));
+  }
+  XLSX.writeFile(wb, 'hasil_semua_rombel.xlsx');
+});
+
+/* ---------- Apply columns button (show selected columns view) ---------- */
+applyColsBtn.addEventListener('click', ()=>{
+  selectedColumnsIdx = getSelectedColumnIndexes();
+  if(selectedColumnsIdx.length===0){ alert('Pilih minimal satu kolom!'); return; }
+  // re-render tables (so each table uses new selected column set)
+  renderAllTables();
+});
+
+/* ---------- Download selected columns (combined) ---------- */
+downloadColsBtn.addEventListener('click', ()=>{
+  if(!selectedColumnsIdx.length){ alert('Pilih kolom terpilih dan tampilkan dulu.'); return; }
+  // Build sheet combining all rombels under their own sheets
+  const wb = XLSX.utils.book_new();
+  for(const rombel in filteredByRombel){
+    const rows = filteredByRombel[rombel];
+    const aoa = [['No', ...selectedColumnsIdx.map(i=>headerRow[i]||'')]];
+    rows.forEach((r,ri)=> aoa.push([ri+1, ...selectedColumnsIdx.map(i=>r[i] || '')]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, rombel.substring(0,30));
+  }
+  XLSX.writeFile(wb, 'kolom_terpilih_hasil.xlsx');
+});
+
+/* ---------- Bottom: Selected Columns Area with short filters per header ---------- */
+function renderSelectedColsArea(){
+  selectedColsArea.innerHTML = '';
+  if(!selectedColumnsIdx || selectedColumnsIdx.length===0){ selectedColsArea.innerHTML = '<div style="color:var(--muted)">Belum memilih kolom.</div>'; return; }
+  // header row for selected
+  const hdrs = selectedColumnsIdx.map(i=>headerRow[i]||('Kolom '+(i+1)));
+  // short filters inputs
+  const shortWrapper = document.createElement('div');
+  shortWrapper.className='shortFilters';
+  hdrs.forEach((h,idx)=>{
+    const inp = document.createElement('input');
+    inp.placeholder = h;
+    inp.dataset.colIndex = selectedColumnsIdx[idx];
+    inp.oninput = ()=> applyShortFilter();
+    shortWrapper.appendChild(inp);
+  });
+  selectedColsArea.appendChild(shortWrapper);
+
+  // Show combined table of ALL rombels chosen with headings per rombel (but user requested bottom to show kolom terpilih)
+  // We'll show single combined table (all rombels appended) with a column "Rombel"
+  const tbl = document.createElement('table');
+  const thead = document.createElement('thead');
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<th>No</th><th>Rombel</th>' + hdrs.map(h=>`<th>${h}</th>`).join('');
+  thead.appendChild(tr);
+  tbl.appendChild(thead);
+  const tbody = document.createElement('tbody');
+
+  // assemble combined rows
+  let counter = 1;
+  for(const rombel in filteredByRombel){
+    const rows = filteredByRombel[rombel];
+    rows.forEach(r=>{
+      const trr = document.createElement('tr');
+      const rowVals = [counter++, rombel, ...selectedColumnsIdx.map(i=>r[i] || '')];
+      trr.innerHTML = rowVals.map(v=>`<td>${v}</td>`).join('');
+      tbody.appendChild(trr);
+    });
+  }
+  tbl.appendChild(tbody);
+  selectedColsArea.appendChild(tbl);
+
+  // add small actions for selected area
+  const actions = document.createElement('div'); actions.style.marginTop='8px';
+  const dlBtn = document.createElement('button'); dlBtn.className='small'; dlBtn.textContent='Download (XLSX)'; dlBtn.onclick = downloadColsBtn.onclick;
+  const dlPdf = document.createElement('button'); dlPdf.className='small'; dlPdf.textContent='Export Ini ke PDF';
+  dlPdf.onclick = ()=> exportElementToPdf(selectedColsArea, 'kolom_terpilih.pdf');
+  actions.appendChild(dlBtn); actions.appendChild(dlPdf);
+  selectedColsArea.appendChild(actions);
 }
+
+/* apply short filter to combined selectedColumns table */
+function applyShortFilter(){
+  const inputs = Array.from(selectedColsArea.querySelectorAll('.shortFilters input'));
+  const filters = inputs.map(inp => ({col: parseInt(inp.dataset.colIndex), q: inp.value.trim().toLowerCase()}));
+  const tbl = selectedColsArea.querySelector('table tbody');
+  if(!tbl) return;
+  const rows = Array.from(tbl.querySelectorAll('tr'));
+  rows.forEach(r=>{
+    // columns: No (0), Rombel (1), then selected columns starting index 2
+    let show = true;
+    filters.forEach((f,i)=>{
+      if(!f.q) return;
+      const cell = r.children[2 + i];
+      const val = cell ? cell.innerText.toLowerCase() : '';
+      if(val.indexOf(f.q) === -1) show = false;
+    });
+    r.style.display = show ? '' : 'none';
+  });
+  // renumber No column
+  let n=0; rows.forEach(row=>{ if(row.style.display !== 'none'){ n++; row.children[0].innerText = n; } });
+}
+
+/* ---------- Export functions ---------- */
+async function exportElementToPdf(elem, filename){
+  // use html2canvas to capture element and jsPDF to create pdf
+  const rect = elem.getBoundingClientRect();
+  const canvas = await html2canvas(elem, { scale: 2, useCORS:true, scrollY: -window.scrollY });
+  const imgData = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','pt','a4');
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+  // scale image to fit width
+  const imgProps = { width: canvas.width, height: canvas.height };
+  const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+  const w = imgProps.width * ratio;
+  const h = imgProps.height * ratio;
+  pdf.addImage(imgData,'PNG', (pdfWidth-w)/2, 20, w, h);
+  pdf.save(filename);
+}
+
+/* ---------- Clear ---------- */
+clearBtn.addEventListener('click', ()=>{
+  resetAll();
+  fileInput.value = '';
+});
+
+/* ---------- Reset state ---------- */
+function resetAll(){
+  workbookData = []; headerRow = []; rawAllRows = []; selectedColumnsIdx = [];
+  filteredByRombel = {}; rombelSelect.innerHTML = ''; tablesArea.innerHTML=''; selectedColsArea.innerHTML=''; columnCheckboxes.innerHTML='';
+  countInfo.innerText = 'File belum dimuat';
+  setProgress(0);
+  populateColumnCheckboxes();
+}
+
+/* ---------- Export all tables to single PDF ---------- */
+exportPdfBtn.addEventListener('click', async ()=>{
+  if(!Object.keys(filteredByRombel).length){ alert('Tidak ada data untuk diexport.'); return; }
+  // We'll render a printable clone of tablesArea to a hidden element and then export
+  const clone = tablesArea.cloneNode(true);
+  clone.style.padding='20px';
+  document.body.appendChild(clone);
+  await exportElementToPdf(clone, 'hasil_semua_rombel.pdf');
+  clone.remove();
+});
+
+/* ---------- Theme toggle ---------- */
+toggleThemeBtn.addEventListener('click', ()=>{
+  if(currentTheme === 'light'){ document.documentElement.setAttribute('data-theme','dark'); currentTheme='dark'; themeLabel.innerText='Dark Mode'; }
+  else { document.documentElement.setAttribute('data-theme','light'); currentTheme='light'; themeLabel.innerText='Light Mode'; }
+});
+
+/* ---------- Initialize defaults ---------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  populateColumnCheckboxes();
+  themeLabel.innerText = 'Light Mode';
+  document.documentElement.setAttribute('data-theme','light');
+});
 </script>
 
 </body>
