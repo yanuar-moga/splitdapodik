@@ -1,7 +1,88 @@
-/* style.css — SMPN 1 Moga theme */
-body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-.card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 8px 24px rgba(4,120,87,0.06); margin-bottom: 1rem; }
-.dt-container { overflow-x: auto; }
-#students-table { width: 100% !important; border-collapse: collapse; }
-#students-table thead th { background: #ecfdf5; color: #065f46; }
-.col-checkbox { transform: scale(1.0); }
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #3a8dde, #6fd3b4);
+  color: #222;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 50px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+h1 {
+  text-align: center;
+  color: #2a6dcf;
+}
+
+.upload-section, .filter-section {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.upload-section input[type="file"] {
+  padding: 6px;
+}
+
+button {
+  background: #2a6dcf;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background: #1e4fa3;
+}
+
+.filter-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.table-container {
+  overflow-x: auto;
+  max-height: 600px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+th {
+  background-color: #2a6dcf;
+  color: white;
+  position: sticky;
+  top: 0;
+}
+
+tr:nth-child(even) {
+  background-color: #f7f7f7;
+}
