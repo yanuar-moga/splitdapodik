@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pemetaan Dapodik - Otomatis Rombel</title>
+  <title>Pemetaan Dapodik Otomatis</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <div class="container">
     <h1>📘 Pemetaan Data Dapodik Otomatis</h1>
-    <p>Unggah file Excel Dapodik Anda (dengan 4 header) untuk menampilkan data per rombel.</p>
+    <p>Unggah file Excel Dapodik Anda (dengan 4 header sebelum tabel data).</p>
 
     <div class="upload-section">
       <input type="file" id="excelFile" accept=".xlsx,.xls">
@@ -34,32 +34,50 @@
   <script>
     let allData = [];
     let filteredData = [];
-
-    const rombelColumn = "Rombel Saat Ini_Unnamed: 42_level_1";
+    let rombelColumn = null;
 
     document.getElementById('loadBtn').addEventListener('click', () => {
       const fileInput = document.getElementById('excelFile');
       if (!fileInput.files.length) return alert('Pilih file Excel terlebih dahulu!');
       const reader = new FileReader();
+
       reader.onload = (e) => {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { range: 4 }); // lewati 4 baris header
+
+        // Lewati 4 baris pertama (header Dapodik)
+        const json = XLSX.utils.sheet_to_json(sheet, { range: 4 });
         allData = json;
 
-        // ambil daftar rombel unik
+        if (allData.length === 0) {
+          alert('Tidak ada data yang bisa dibaca dari file ini.');
+          return;
+        }
+
+        // 🔍 Deteksi otomatis kolom yang mengandung kata "Rombel"
+        const headers = Object.keys(allData[0]);
+        rombelColumn = headers.find(h => h.toLowerCase().includes("rombel"));
+
+        if (!rombelColumn) {
+          alert('Kolom rombel tidak ditemukan! Pastikan file Dapodik benar.');
+          return;
+        }
+
+        // Dapatkan daftar rombel unik
         const rombelList = [...new Set(allData.map(r => r[rombelColumn]).filter(Boolean))];
         tampilkanDaftarRombel(rombelList);
       };
+
       reader.readAsArrayBuffer(fileInput.files[0]);
     });
 
     function tampilkanDaftarRombel(list) {
       const container = document.getElementById('rombelList');
-      container.innerHTML = '<h2>Daftar Rombel</h2>';
+      container.innerHTML = '<h2>📋 Daftar Rombel</h2>';
+
       if (list.length === 0) {
-        container.innerHTML += '<p>Tidak ditemukan kolom rombel di file Excel.</p>';
+        container.innerHTML += '<p>Tidak ditemukan data rombel di file Excel.</p>';
         return;
       }
 
@@ -85,14 +103,14 @@
       filteredData = allData.filter(row => row[rombelColumn] === rombel);
       if (!filteredData.length) return alert('Tidak ada data untuk rombel ini.');
 
-      const tableSection = document.getElementById('tableSection');
       const head = document.getElementById('tableHead');
       const body = document.getElementById('tableBody');
       const title = document.getElementById('rombelTitle');
+      const section = document.getElementById('tableSection');
 
-      title.textContent = `📋 Data Rombel: ${rombel}`;
+      title.textContent = `📊 Data Rombel: ${rombel}`;
       head.innerHTML = ''; body.innerHTML = '';
-      tableSection.style.display = 'block';
+      section.style.display = 'block';
 
       const headers = Object.keys(filteredData[0]);
       const trHead = document.createElement('tr');
@@ -119,7 +137,7 @@
       const ws = XLSX.utils.json_to_sheet(filteredData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Rombel');
-      const namaFile = `Data_${document.getElementById('rombelTitle').textContent.replace("📋 Data Rombel: ", "")}.xlsx`;
+      const namaFile = `Data_${document.getElementById('rombelTitle').textContent.replace("📊 Data Rombel: ", "")}.xlsx`;
       XLSX.writeFile(wb, namaFile);
     });
   </script>
