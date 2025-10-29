@@ -2,33 +2,34 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Aplikasi Filter Dapodik per Rombel & Kolom</title>
+  <title>Aplikasi Filter Dapodik per Rombel</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
     h2 { display: flex; align-items: center; gap: 8px; }
-    select, button { margin: 6px; padding: 5px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-    th, td { border: 1px solid #aaa; padding: 6px; text-align: left; }
-    th { background: #f3f3f3; }
-    .checkbox-container { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 10px; }
-    label { border: 1px solid #ccc; border-radius: 6px; padding: 5px 10px; background: #f8f8f8; }
+    select, button, input { margin: 6px; padding: 5px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #888; padding: 6px; text-align: left; }
+    th { background: #f2f2f2; }
+    .checkbox-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    label { border: 1px solid #ccc; padding: 4px 8px; border-radius: 6px; background: #fafafa; }
   </style>
 </head>
 <body>
-  <h2>📊 Aplikasi Filter Dapodik per Rombel & Kolom</h2>
+  <h2>📘 Aplikasi Filter Data Dapodik per Rombel</h2>
 
   <input type="file" id="fileInput" accept=".xlsx, .xls" />
-  <select id="rombelSelect">
-    <option value="">-- Pilih Rombel --</option>
-  </select>
+  <select id="rombelSelect"><option value="">-- Pilih Rombel --</option></select>
   <button id="filterBtn">Proses Filter</button>
   <button id="downloadBtn">Download Excel</button>
 
-  <h3>Pilih Kolom yang Ingin Ditampilkan:</h3>
-  <div id="columnCheckboxes" class="checkbox-container"></div>
-  <button id="showColumnsBtn">Tampilkan Kolom</button>
-
   <div id="tableContainer"></div>
+
+  <hr>
+  <h3>🔍 Pilih Kolom yang Ingin Ditampilkan</h3>
+  <div id="columnCheckboxes" class="checkbox-container"></div>
+  <button id="showColumnsBtn">Tampilkan Kolom Terpilih</button>
+  <button id="downloadSelectedBtn">Download Kolom Terpilih (XLS)</button>
+  <div id="filteredColumnsContainer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.2/dist/xlsx.full.min.js"></script>
   <script src="script.js"></script>
