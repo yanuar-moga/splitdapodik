@@ -20,7 +20,7 @@ h1 {
   color: #2a6dcf;
 }
 
-.upload-section, .filter-section {
+.upload-section {
   display: flex;
   justify-content: center;
   gap: 10px;
@@ -46,27 +46,36 @@ button:hover {
   background: #1e4fa3;
 }
 
-.filter-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.rombel-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
 }
 
-select {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+.rombel-card {
+  background: #f8f9ff;
+  border: 1px solid #d8e0f0;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.rombel-card h3 {
+  margin: 10px 0;
+  color: #2a6dcf;
 }
 
 .table-container {
   overflow-x: auto;
   max-height: 600px;
+  margin-top: 20px;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
 }
 
 th, td {
