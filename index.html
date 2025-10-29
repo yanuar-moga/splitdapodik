@@ -1,99 +1,112 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dapodik Mapper — SMPN 1 Moga</title>
-
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- jQuery + DataTables -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-
-  <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pemetaan Data Dapodik - SMPN 1 Moga</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-green-50 min-h-screen p-6">
+<body>
+  <div class="container">
+    <h1>📊 Pemetaan Data Dapodik</h1>
+    <p>Unggah file Excel Dapodik Anda untuk memisahkan data per rombel</p>
 
-  <div class="max-w-6xl mx-auto">
-    <header class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-emerald-800">📘 Dapodik Mapper — SMPN 1 MOGA</h1>
-        <p class="text-sm text-emerald-700">Filter per kolom • Pilih rombel • PROSES • Download per rombel atau hasil filter</p>
-      </div>
-      <div class="text-sm text-emerald-700">Client-side · SheetJS + DataTables</div>
-    </header>
+    <div class="upload-section">
+      <input type="file" id="excelFile" accept=".xlsx, .xls">
+      <button id="loadBtn">📂 Muat Data</button>
+    </div>
 
-    <!-- Upload + controls -->
-    <section class="card mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <div>
-          <label class="block text-sm font-medium mb-1">Upload file Excel (.xlsx)</label>
-          <input id="file-input" type="file" accept=".xlsx, .xls" class="w-full border rounded px-3 py-2 bg-white"/>
-          <p class="mt-2 text-xs text-emerald-600">Script skip 4 baris awal; header tabel di baris ke-5 (sesuai format Dapodik).</p>
-        </div>
+    <div class="filter-section" style="display:none;">
+      <label for="rombelSelect">Pilih Rombel:</label>
+      <select id="rombelSelect"></select>
+      <button id="processBtn">🔍 Proses</button>
+      <button id="downloadBtn">💾 Download Excel</button>
+    </div>
 
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium mb-1">Pilih Rombel</label>
-          <div class="flex gap-2">
-            <select id="filter-rombel" class="flex-1 border rounded px-3 py-2 bg-white"></select>
-            <button id="process-btn" class="px-4 py-2 rounded bg-emerald-700 text-white">PROSES</button>
-            <button id="reset-btn" class="px-4 py-2 rounded border bg-white text-emerald-700">Reset</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="load-status" class="mt-3 text-sm text-emerald-700 hidden">Memuat file... <span id="load-spinner">⏳</span></div>
-    </section>
-
-    <!-- Columns checklist -->
-    <section class="card mb-6">
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-sm text-emerald-700">Centang kolom yang ingin ditampilkan / diekspor (urut sesuai checkbox)</div>
-        <div class="flex gap-2">
-          <button id="select-all-cols" class="px-2 py-1 rounded border">Pilih Semua</button>
-          <button id="clear-all-cols" class="px-2 py-1 rounded border">Bersihkan</button>
-        </div>
-      </div>
-
-      <div id="columns-container" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm max-h-48 overflow-auto p-2 border rounded bg-white">
-        <!-- checkbox items injected by script -->
-      </div>
-    </section>
-
-    <!-- Table and actions -->
-    <section class="card mb-6">
-      <div class="flex items-center gap-4 mb-4">
-        <div class="text-sm text-emerald-700">Status: <span id="notice-text">Belum ada file di-upload.</span></div>
-        <div class="ml-auto flex gap-2">
-          <button id="download-filtered-btn" class="px-4 py-2 rounded bg-emerald-700 text-white">Download Hasil (kolom terpilih)</button>
-          <button id="download-rombel-btn" class="px-4 py-2 rounded bg-blue-600 text-white">Download per Rombel (terpilih)</button>
-        </div>
-      </div>
-
-      <div class="dt-container bg-white p-3 rounded">
-        <table id="students-table" class="display stripe hover" style="width:100%">
-          <thead>
-            <tr id="table-head-row"></tr>
-            <!-- second header row for per-column filters (injected dynamically) -->
-            <tr id="table-filter-row"></tr>
-          </thead>
-          <tbody id="table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <footer class="text-sm text-emerald-700 text-center mt-6">
-      Jika mau tambahan filter tanggal/range atau exact-match, sebutkan nanti.
-    </footer>
+    <div class="table-container">
+      <table id="dataTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- script deferred so DOM exists -->
-  <script src="script.js" defer></script>
+  <script>
+    let allData = [];
+
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      const fileInput = document.getElementById('excelFile');
+      if (!fileInput.files.length) return alert('Pilih file Excel terlebih dahulu!');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { range: 4 }); // lewati 4 header
+        allData = json;
+
+        const rombelCol = "Rombel Saat Ini_Unnamed: 42_level_1";
+        const rombelList = [...new Set(allData.map(row => row[rombelCol]).filter(v => v))];
+
+        const rombelSelect = document.getElementById('rombelSelect');
+        rombelSelect.innerHTML = '<option value="">-- Pilih Rombel --</option>';
+        rombelList.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r;
+          opt.textContent = r;
+          rombelSelect.appendChild(opt);
+        });
+
+        document.querySelector('.filter-section').style.display = 'flex';
+        alert('File berhasil dimuat! Silakan pilih rombel.');
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+
+    document.getElementById('processBtn').addEventListener('click', () => {
+      const rombelCol = "Rombel Saat Ini_Unnamed: 42_level_1";
+      const selectedRombel = document.getElementById('rombelSelect').value;
+      if (!selectedRombel) return alert('Pilih rombel terlebih dahulu!');
+      const filtered = allData.filter(row => row[rombelCol] === selectedRombel);
+      renderTable(filtered);
+    });
+
+    function renderTable(data) {
+      const head = document.getElementById('tableHead');
+      const body = document.getElementById('tableBody');
+      head.innerHTML = ''; body.innerHTML = '';
+
+      if (!data.length) return alert('Tidak ada data untuk rombel ini!');
+      const headers = Object.keys(data[0]);
+
+      const headerRow = document.createElement('tr');
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
+      });
+      head.appendChild(headerRow);
+
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        headers.forEach(h => {
+          const td = document.createElement('td');
+          td.textContent = row[h] || '';
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const table = document.getElementById('dataTable');
+      if (!table.rows.length) return alert('Tidak ada data untuk diunduh!');
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.table_to_sheet(table);
+      XLSX.utils.book_append_sheet(wb, ws, 'Filtered');
+      XLSX.writeFile(wb, 'Data_Rombel.xlsx');
+    });
+  </script>
 </body>
 </html>
