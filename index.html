@@ -2,144 +2,163 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pemetaan Dapodik Otomatis</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <title>Filter Data Dapodik per Rombel</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background: #f3f4f6;
+      padding: 20px;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    input, select, button {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #0078ff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #005fcc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table th, table td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: left;
+      font-size: 13px;
+    }
+    table th {
+      background: #0078ff;
+      color: white;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <h1>📘 Pemetaan Data Dapodik Otomatis</h1>
-    <p>Unggah file Excel Dapodik Anda (dengan 4 header sebelum tabel data).</p>
+  <h2>📊 Aplikasi Filter Data Dapodik per Rombel</h2>
+  <div class="card">
+    <input type="file" id="inputExcel" accept=".xlsx,.xls" />
+    <br>
+    <label for="rombelSelect"><b>Pilih Rombel:</b></label>
+    <select id="rombelSelect"></select>
+    <button id="btnFilter">Proses Filter</button>
+    <button id="btnDownload">Download Excel</button>
 
-    <div class="upload-section">
-      <input type="file" id="excelFile" accept=".xlsx,.xls">
-      <button id="loadBtn">📂 Muat Data</button>
-    </div>
-
-    <div id="rombelList" class="rombel-list"></div>
-
-    <div id="tableSection" style="display:none;">
-      <h2 id="rombelTitle"></h2>
-      <button id="downloadBtn">💾 Download Excel Rombel Ini</button>
-      <div class="table-container">
-        <table id="dataTable">
-          <thead id="tableHead"></thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div id="tableContainer"></div>
   </div>
 
   <script>
     let allData = [];
     let filteredData = [];
-    let rombelColumn = null;
 
-    document.getElementById('loadBtn').addEventListener('click', () => {
-      const fileInput = document.getElementById('excelFile');
-      if (!fileInput.files.length) return alert('Pilih file Excel terlebih dahulu!');
+    document.getElementById('inputExcel').addEventListener('change', handleFile, false);
+    document.getElementById('btnFilter').addEventListener('click', filterData);
+    document.getElementById('btnDownload').addEventListener('click', downloadExcel);
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
       const reader = new FileReader();
-
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
+      reader.onload = function (event) {
+        const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
+
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        // Lewati 4 baris pertama (header Dapodik)
-        const json = XLSX.utils.sheet_to_json(sheet, { range: 4 });
-        allData = json;
+        // Lewati 4 baris header
+        const headers = json[4];
+        const rows = json.slice(5);
 
-        if (allData.length === 0) {
-          alert('Tidak ada data yang bisa dibaca dari file ini.');
-          return;
-        }
+        allData = rows.map(row => {
+          let obj = {};
+          headers.forEach((h, i) => {
+            obj[h] = row[i];
+          });
+          return obj;
+        });
 
-        // 🔍 Deteksi otomatis kolom yang mengandung kata "Rombel"
-        const headers = Object.keys(allData[0]);
-        rombelColumn = headers.find(h => h.toLowerCase().includes("rombel"));
+        // Deteksi kolom Rombel otomatis
+        const rombelCol = headers.find(h => h.toLowerCase().includes("rombel"));
+        const rombelList = [...new Set(allData.map(d => d[rombelCol]).filter(Boolean))];
 
-        if (!rombelColumn) {
-          alert('Kolom rombel tidak ditemukan! Pastikan file Dapodik benar.');
-          return;
-        }
+        // Isi dropdown
+        const select = document.getElementById('rombelSelect');
+        select.innerHTML = rombelList.map(r => `<option value="${r}">${r}</option>`).join('');
 
-        // Dapatkan daftar rombel unik
-        const rombelList = [...new Set(allData.map(r => r[rombelColumn]).filter(Boolean))];
-        tampilkanDaftarRombel(rombelList);
+        alert("File Excel berhasil dimuat ✅. Ditemukan " + rombelList.length + " rombel.");
       };
+      reader.readAsArrayBuffer(file);
+    }
 
-      reader.readAsArrayBuffer(fileInput.files[0]);
-    });
-
-    function tampilkanDaftarRombel(list) {
-      const container = document.getElementById('rombelList');
-      container.innerHTML = '<h2>📋 Daftar Rombel</h2>';
-
-      if (list.length === 0) {
-        container.innerHTML += '<p>Tidak ditemukan data rombel di file Excel.</p>';
+    function filterData() {
+      const rombel = document.getElementById('rombelSelect').value;
+      if (!rombel) {
+        alert("Pilih rombel terlebih dahulu!");
         return;
       }
 
-      list.forEach(rombel => {
-        const card = document.createElement('div');
-        card.className = 'rombel-card';
-        card.innerHTML = `
-          <h3>${rombel}</h3>
-          <button class="lihatBtn" data-rombel="${rombel}">Lihat Data</button>
-        `;
-        container.appendChild(card);
-      });
+      const rombelCol = Object.keys(allData[0]).find(h => h.toLowerCase().includes("rombel"));
+      filteredData = allData.filter(d => d[rombelCol] === rombel);
 
-      document.querySelectorAll('.lihatBtn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const selected = e.target.getAttribute('data-rombel');
-          tampilkanTabelRombel(selected);
-        });
-      });
+      renderTable(filteredData);
     }
 
-    function tampilkanTabelRombel(rombel) {
-      filteredData = allData.filter(row => row[rombelColumn] === rombel);
-      if (!filteredData.length) return alert('Tidak ada data untuk rombel ini.');
+    function renderTable(data) {
+      if (!data.length) {
+        document.getElementById('tableContainer').innerHTML = "<p>Tidak ada data untuk ditampilkan.</p>";
+        return;
+      }
 
-      const head = document.getElementById('tableHead');
-      const body = document.getElementById('tableBody');
-      const title = document.getElementById('rombelTitle');
-      const section = document.getElementById('tableSection');
+      const headers = Object.keys(data[0]);
+      let html = "<table><thead><tr>";
+      headers.forEach(h => html += `<th>${h}</th>`);
+      html += "</tr></thead><tbody>";
 
-      title.textContent = `📊 Data Rombel: ${rombel}`;
-      head.innerHTML = ''; body.innerHTML = '';
-      section.style.display = 'block';
-
-      const headers = Object.keys(filteredData[0]);
-      const trHead = document.createElement('tr');
-      headers.forEach(h => {
-        const th = document.createElement('th');
-        th.textContent = h;
-        trHead.appendChild(th);
+      data.forEach(row => {
+        html += "<tr>";
+        headers.forEach(h => html += `<td>${row[h] || ""}</td>`);
+        html += "</tr>";
       });
-      head.appendChild(trHead);
 
-      filteredData.forEach(row => {
-        const tr = document.createElement('tr');
-        headers.forEach(h => {
-          const td = document.createElement('td');
-          td.textContent = row[h] || '';
-          tr.appendChild(td);
-        });
-        body.appendChild(tr);
-      });
+      html += "</tbody></table>";
+      document.getElementById('tableContainer').innerHTML = html;
     }
 
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      if (!filteredData.length) return alert('Tidak ada data yang bisa diunduh.');
+    function downloadExcel() {
+      if (!filteredData.length) {
+        alert("Filter data dulu sebelum download!");
+        return;
+      }
+
       const ws = XLSX.utils.json_to_sheet(filteredData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Rombel');
-      const namaFile = `Data_${document.getElementById('rombelTitle').textContent.replace("📊 Data Rombel: ", "")}.xlsx`;
-      XLSX.writeFile(wb, namaFile);
-    });
+      XLSX.utils.book_append_sheet(wb, ws, "Data Rombel");
+      XLSX.writeFile(wb, `Data_${document.getElementById('rombelSelect').value}.xlsx`);
+    }
   </script>
 </body>
 </html>
