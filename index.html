@@ -1,95 +1,158 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Loader Data Siswa Otomatis</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    body {
-      font-family: "Poppins", sans-serif;
-      background: #f4f7fc;
-      padding: 20px;
-      color: #333;
-    }
-    .card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 16px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    h2 {
-      text-align: center;
-      color: #2b4eff;
-    }
-    input[type=file] {
-      display: block;
-      margin: 20px auto;
-    }
-    #output {
-      margin-top: 20px;
-      white-space: pre-wrap;
-      font-size: 14px;
-      background: #f9f9f9;
-      border-radius: 10px;
-      padding: 10px;
-    }
-    .loading {
-      text-align: center;
-      color: #777;
-      font-style: italic;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi Filter Data Dapodik per Rombel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 30px;
+    background: #f9fafb;
+    color: #222;
+  }
+  h1 {
+    font-size: 22px;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h1::before {
+    content: "📊";
+  }
+  label {
+    font-weight: 600;
+    margin-right: 5px;
+  }
+  input[type="file"], select, button {
+    margin: 5px 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+  }
+  button {
+    background: #3498db;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #2980b9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    text-align: left;
+  }
+  th {
+    background: #eef3f7;
+  }
+  .loading {
+    color: #555;
+    font-style: italic;
+  }
+</style>
 </head>
 <body>
-  <div class="card">
-    <h2>📘 Pembaca Data Siswa</h2>
-    <input type="file" id="excelFile" accept=".xlsx,.xls" />
-    <div id="output">Silakan pilih file Excel...</div>
-  </div>
 
-  <script>
-    document.getElementById("excelFile").addEventListener("change", handleFile, false);
+<h1>Aplikasi Filter Data Dapodik per Rombel</h1>
 
-    function handleFile(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
+<input type="file" id="excelFile" accept=".xlsx, .xls" />
+<div id="output"></div>
+<div id="tableContainer"></div>
 
-      document.getElementById("output").innerHTML = "<p class='loading'>⏳ Membaca file...</p>";
+<script>
+let fullData = [];
+let headerRow = [];
+let filteredData = [];
 
-      reader.onload = function (e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+document.getElementById("excelFile").addEventListener("change", handleFile, false);
 
-        // Cari kolom AQ (ke-43)
-        const colIndex = 42; // kolom AQ = index 42 (0-based)
-        let rombelList = [];
-        json.forEach((row, i) => {
-          if (i > 0 && row[colIndex]) {
-            rombelList.push(row[colIndex]);
-          }
-        });
-
-        rombelList = [...new Set(rombelList.filter(Boolean))]; // hapus duplikat & kosong
-
-        if (rombelList.length === 0) {
-          document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom AQ tidak ditemukan atau kosong!</p>";
-          return;
-        }
-
-        // Tampilkan hasil otomatis
-        let html = `<p>✅ File berhasil dimuat!</p><b>Daftar Rombel Ditemukan (${rombelList.length}):</b><br>`;
-        html += rombelList.map(r => "• " + r).join("<br>");
-        document.getElementById("output").innerHTML = html;
-      };
-      reader.readAsArrayBuffer(file);
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  document.getElementById("output").innerHTML = "<p class='loading'>⏳ Membaca file Excel...</p>";
+  reader.onload = function (e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    headerRow = json[4]; // karena baris ke-5 adalah header sebenarnya
+    fullData = json.slice(5); // data mulai dari baris ke-6
+    const colIndex = 42; // kolom AQ = Rombel Saat Ini
+    let rombelList = [];
+    fullData.forEach(row => {
+      if (row[colIndex]) {
+        const rombel = String(row[colIndex]).trim();
+        if (rombel) rombelList.push(rombel);
+      }
+    });
+    rombelList = [...new Set(rombelList.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+    if (rombelList.length === 0) {
+      document.getElementById("output").innerHTML = "<p style='color:red;'>❌ Kolom 'Rombel Saat Ini' (AQ) tidak ditemukan!</p>";
+      return;
     }
-  </script>
+    const selectHTML = `
+      <label for="rombelSelect">Pilih Rombel:</label>
+      <select id="rombelSelect">
+        <option value="">-- Pilih Rombel --</option>
+        ${rombelList.map(r => `<option value="${r}">${r}</option>`).join("")}
+      </select>
+      <button onclick="filterRombel()">Proses Filter</button>
+      <button onclick="downloadExcel()">Download Excel</button>
+    `;
+    document.getElementById("output").innerHTML = `<p>✅ File berhasil dimuat!</p>${selectHTML}`;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function filterRombel() {
+  const selectedRombel = document.getElementById("rombelSelect").value;
+  if (!selectedRombel) {
+    alert("Pilih rombel terlebih dahulu!");
+    return;
+  }
+  const colIndex = 42;
+  filteredData = fullData.filter(row => String(row[colIndex]).trim() === selectedRombel);
+  displayTable(filteredData);
+}
+
+function displayTable(data) {
+  if (data.length === 0) {
+    document.getElementById("tableContainer").innerHTML = "<p style='color:red;'>Tidak ada data untuk rombel ini.</p>";
+    return;
+  }
+  let tableHTML = "<table><thead><tr>" + headerRow.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
+  data.forEach(row => {
+    tableHTML += "<tr>" + headerRow.map((_,i)=>`<td>${row[i] || ""}</td>`).join("") + "</tr>";
+  });
+  tableHTML += "</tbody></table>";
+  document.getElementById("tableContainer").innerHTML = tableHTML;
+}
+
+function downloadExcel() {
+  if (!filteredData || filteredData.length === 0) {
+    alert("Tidak ada data untuk diunduh!");
+    return;
+  }
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...filteredData]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Hasil Filter");
+  XLSX.writeFile(wb, "hasil_filter_rombel.xlsx");
+}
+</script>
+
 </body>
 </html>
