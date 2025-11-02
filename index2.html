@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi Filter Data Excel Dapodik</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  body {
+    font-family: "Poppins", Arial, sans-serif;
+    margin: 0;
+    background: #f0f4f8;
+    color: #222;
+  }
+  header {
+    background: linear-gradient(135deg, #1d72b8, #155a8a);
+    color: white;
+    text-align: center;
+    padding: 20px 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  }
+  header img {
+    width: 60px;
+    vertical-align: middle;
+    border-radius: 50%;
+    margin-right: 10px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 5px 0 0;
+  }
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    opacity: 0.8;
+  }
+  main {
+    max-width: 1000px;
+    background: white;
+    margin: 25px auto;
+    padding: 20px 30px;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  }
+  h2 {
+    font-size: 18px;
+    color: #1d72b8;
+    border-left: 4px solid #1d72b8;
+    padding-left: 10px;
+  }
+  input[type="file"], select, button, input[type="text"] {
+    margin: 6px 4px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+  }
+  button {
+    background: #1d72b8;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+    border: none;
+  }
+  button:hover {
+    background: #155a8a;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  th {
+    background: #e8f1f9;
+  }
+  .checkbox-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 10px 0;
+  }
+  .checkbox-list label {
+    font-size: 14px;
+  }
+  .btn-row {
+    margin-top: 10px;
+  }
+  #searchInput {
+    margin: 10px 0;
+    width: 60%;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjyxUJx7niMdG-f-iOxaI2uhnRbDLkSY1SNZhZNt7FMRPWiyrFq_WbRHhHCBqz_1K1kK4E9DoTjwZc8hi7um6UxgJRCxX99Orse05vW3SSZst7BjPdA6qPyzy0Jq7oOhC1S9KYq2RKZ6vAhnJA0GkfHK2LUK-2hclQEmP8hzjGKz_h4fLASHl5GOvfs4o0/s722/mb.jpg" alt="Logo">
+  <h1>Aplikasi Filter Data Excel Dapodik</h1>
+  <p>Version 1.1 (Update 2 November 2025)</p>
+</header>
+
+<main>
+  <h2>📂 Upload & Pilih Rombel</h2>
+  <input type="file" id="excelFile" accept=".xlsx, .xls" />
+  <div id="output"></div>
+
+  <div id="columnSelector" style="margin-top:20px;"></div>
+  <input type="text" id="searchInput" placeholder="🔍 Cari nama atau data..." onkeyup="searchTable()" style="display:none;">
+  <div id="tableContainer"></div>
+</main>
+
+<script>
+let fullData = [], headerRow = [], filteredData = [], selectedCols = [];
+
+document.getElementById("excelFile").addEventListener("change", handleFile, false);
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  document.getElementById("output").innerHTML = "<p>⏳ Membaca file Excel...</p>";
+  reader.onload = function (e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    headerRow = json[4] || [];
+    fullData = json.slice(5);
+
+    // Tambah nama kolom manual agar lebih jelas
+    headerRow[26] = "Pendidikan Ayah"; // AA
+    headerRow[27] = "Pekerjaan Ayah";  // AB
+    headerRow[28] = "Penghasilan Ayah"; // AC
+    headerRow[32] = "Pendidikan Ibu"; // AG
+    headerRow[33] = "Pekerjaan Ibu";  // AH
+    headerRow[34] = "Penghasilan Ibu"; // AI
+
+    const colIndex = 42; // Kolom "Rombel Saat Ini"
+    let rombelList = [...new Set(fullData.map(r => String(r[colIndex] || "").trim()).filter(v => v && v.toLowerCase() !== "rombel saat ini"))];
+    rombelList.sort((a,b)=>a.localeCompare(b,'id'));
+    document.getElementById("output").innerHTML = `
+      <label>Pilih Rombel:</label>
+      <select id="rombelSelect">
+        <option value="">-- Pilih Rombel --</option>
+        ${rombelList.map(r=>`<option value="${r}">${r}</option>`).join("")}
+      </select>
+      <button onclick="filterRombel()">Tampilkan Data</button>
+    `;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function filterRombel() {
+  const selectedRombel = document.getElementById("rombelSelect").value;
+  if (!selectedRombel) return alert("Pilih rombel dulu!");
+  const colIndex = 42;
+  filteredData = fullData.filter(r => String(r[colIndex]).trim() === selectedRombel);
+  showColumnSelector();
+}
+
+function showColumnSelector() {
+  const html = `
+    <h2>📋 Pilih Kolom yang Ingin Ditampilkan</h2>
+    <div class="checkbox-list">
+      ${headerRow.map((h,i)=>`<label><input type="checkbox" value="${i}"> ${h || "Kolom " + (i+1)}</label>`).join("")}
+    </div>
+    <div class="btn-row">
+      <button onclick="selectAllCols()">Select All</button>
+      <button onclick="clearAllCols()">Clear All</button>
+      <button onclick="showSelectedCols()">Tampilkan Kolom Terpilih</button>
+    </div>
+  `;
+  document.getElementById("columnSelector").innerHTML = html;
+}
+
+function selectAllCols() {
+  document.querySelectorAll('#columnSelector input[type="checkbox"]').forEach(cb => cb.checked = true);
+}
+
+function clearAllCols() {
+  document.querySelectorAll('#columnSelector input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+
+function showSelectedCols() {
+  const checkboxes = document.querySelectorAll('#columnSelector input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) return alert("Pilih minimal satu kolom!");
+  selectedCols = Array.from(checkboxes).map(cb => parseInt(cb.value));
+  document.getElementById("searchInput").style.display = "block";
+  displayTable(filteredData);
+}
+
+function displayTable(data) {
+  let tableHTML = "<table id='dataTable'><thead><tr><th>No</th>";
+  selectedCols.forEach(i => tableHTML += `<th>${headerRow[i]}</th>`);
+  tableHTML += "</tr></thead><tbody>";
+  data.forEach((row, idx) => {
+    tableHTML += `<tr><td>${idx+1}</td>`;
+    selectedCols.forEach(i => tableHTML += `<td>${row[i] || ""}</td>`);
+    tableHTML += "</tr>";
+  });
+  tableHTML += "</tbody></table>";
+  document.getElementById("tableContainer").innerHTML = `
+    ${tableHTML}
+    <div class="btn-row">
+      <button onclick="downloadExcel()">Download Excel</button>
+      <button onclick="downloadPDF()">Download PDF</button>
+    </div>
+  `;
+}
+
+function searchTable() {
+  const input = document.getElementById("searchInput").value.toLowerCase();
+  const rows = document.querySelectorAll("#dataTable tbody tr");
+  rows.forEach(r => {
+    const text = r.textContent.toLowerCase();
+    r.style.display = text.includes(input) ? "" : "none";
+  });
+}
+
+function downloadExcel() {
+  const header = ["No", ...selectedCols.map(i => headerRow[i])];
+  const data = filteredData.map((r, idx) => [idx+1, ...selectedCols.map(i => r[i] || "")]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data Terpilih");
+  XLSX.writeFile(wb, "data_terpilih.xlsx");
+}
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
+  const header = ["No", ...selectedCols.map(i => headerRow[i])];
+  const data = filteredData.map((r, idx) => [idx+1, ...selectedCols.map(i => r[i] || "")]);
+  let y = 15;
+  doc.setFontSize(12);
+  doc.text("Data Dapodik (Export PDF)", 10, 10);
+  header.forEach((h, i) => doc.text(h, 10 + i * 40, y));
+  y += 8;
+  data.forEach(row => {
+    row.forEach((cell, i) => doc.text(String(cell), 10 + i * 40, y));
+    y += 8;
+    if (y > 190) { doc.addPage(); y = 15; }
+  });
+  doc.save("data_terpilih.pdf");
+}
+</script>
+
+</body>
+</html>
