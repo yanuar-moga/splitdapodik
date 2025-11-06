@@ -118,8 +118,27 @@
 
 <script>
 let fullData = [], headerRow = [], filteredData = [], selectedCols = [];
+let nameFormat = { siswa: "normal", ayah: "normal", ibu: "normal", wali: "normal" };
 
 document.getElementById("excelFile").addEventListener("change", handleFile, false);
+
+function properCase(text) {
+  return String(text).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function applyFormat(colIndex, value) {
+  if (value === undefined) return "";
+  let mode = "";
+  if (colIndex === 1) mode = nameFormat.siswa;
+  if (colIndex === 24) mode = nameFormat.ayah;
+  if (colIndex === 30) mode = nameFormat.ibu;
+  if (colIndex === 36) mode = nameFormat.wali;
+
+  if (mode === "upper") return String(value).toUpperCase();
+  if (mode === "lower") return String(value).toLowerCase();
+  if (mode === "proper") return properCase(value);
+  return value;
+}
 
 function handleFile(e) {
   const file = e.target.files[0];
@@ -135,15 +154,14 @@ function handleFile(e) {
     headerRow = json[4] || [];
     fullData = json.slice(5);
 
-    // Tambah nama kolom manual agar lebih jelas
-    headerRow[26] = "Pendidikan Ayah"; // AA
-    headerRow[27] = "Pekerjaan Ayah";  // AB
-    headerRow[28] = "Penghasilan Ayah"; // AC
-    headerRow[32] = "Pendidikan Ibu"; // AG
-    headerRow[33] = "Pekerjaan Ibu";  // AH
-    headerRow[34] = "Penghasilan Ibu"; // AI
+    headerRow[26] = "Pendidikan Ayah";
+    headerRow[27] = "Pekerjaan Ayah";
+    headerRow[28] = "Penghasilan Ayah";
+    headerRow[32] = "Pendidikan Ibu";
+    headerRow[33] = "Pekerjaan Ibu";
+    headerRow[34] = "Penghasilan Ibu";
 
-    const colIndex = 42; // Kolom "Rombel Saat Ini"
+    const colIndex = 42;
     let rombelList = [...new Set(fullData.map(r => String(r[colIndex] || "").trim()).filter(v => v && v.toLowerCase() !== "rombel saat ini"))];
     rombelList.sort((a,b)=>a.localeCompare(b,'id'));
     document.getElementById("output").innerHTML = `
@@ -172,6 +190,41 @@ function showColumnSelector() {
     <div class="checkbox-list">
       ${headerRow.map((h,i)=>`<label><input type="checkbox" value="${i}"> ${h || "Kolom " + (i+1)}</label>`).join("")}
     </div>
+
+    <h2>⚙ Format Penulisan Nama</h2>
+    <p>Nama Siswa: 
+      <select onchange="nameFormat.siswa=this.value">
+        <option value="normal">Normal</option>
+        <option value="upper">UPPER</option>
+        <option value="lower">lower</option>
+        <option value="proper">Proper</option>
+      </select>
+    </p>
+    <p>Nama Ayah: 
+      <select onchange="nameFormat.ayah=this.value">
+        <option value="normal">Normal</option>
+        <option value="upper">UPPER</option>
+        <option value="lower">lower</option>
+        <option value="proper">Proper</option>
+      </select>
+    </p>
+    <p>Nama Ibu: 
+      <select onchange="nameFormat.ibu=this.value">
+        <option value="normal">Normal</option>
+        <option value="upper">UPPER</option>
+        <option value="lower">lower</option>
+        <option value="proper">Proper</option>
+      </select>
+    </p>
+    <p>Nama Wali: 
+      <select onchange="nameFormat.wali=this.value">
+        <option value="normal">Normal</option>
+        <option value="upper">UPPER</option>
+        <option value="lower">lower</option>
+        <option value="proper">Proper</option>
+      </select>
+    </p>
+
     <div class="btn-row">
       <button onclick="selectAllCols()">Select All</button>
       <button onclick="clearAllCols()">Clear All</button>
@@ -203,7 +256,10 @@ function displayTable(data) {
   tableHTML += "</tr></thead><tbody>";
   data.forEach((row, idx) => {
     tableHTML += `<tr><td>${idx+1}</td>`;
-    selectedCols.forEach(i => tableHTML += `<td>${row[i] || ""}</td>`);
+    selectedCols.forEach(i => {
+      const value = applyFormat(i, row[i]);
+      tableHTML += `<td>${value || ""}</td>`;
+    });
     tableHTML += "</tr>";
   });
   tableHTML += "</tbody></table>";
@@ -227,7 +283,10 @@ function searchTable() {
 
 function downloadExcel() {
   const header = ["No", ...selectedCols.map(i => headerRow[i])];
-  const data = filteredData.map((r, idx) => [idx+1, ...selectedCols.map(i => r[i] || "")]);
+  const data = filteredData.map((r, idx) => [
+    idx+1,
+    ...selectedCols.map(i => applyFormat(i, r[i]) || "")
+  ]);
   const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Data Terpilih");
@@ -238,7 +297,10 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape" });
   const header = ["No", ...selectedCols.map(i => headerRow[i])];
-  const data = filteredData.map((r, idx) => [idx+1, ...selectedCols.map(i => r[i] || "")]);
+  const data = filteredData.map((r, idx) => [
+    idx+1,
+    ...selectedCols.map(i => applyFormat(i, r[i]) || "")
+  ]);
   let y = 15;
   doc.setFontSize(12);
   doc.text("Data Dapodik (Export PDF)", 10, 10);
