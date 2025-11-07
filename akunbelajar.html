@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Pencocokan Akun Belajar Siswa</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+    font-family: Segoe UI, Arial;
+    background:#f5f8ff;
+    margin:0;
+    padding:20px;
+    color:#1a1a1a;
+    transition:0.3s;
+}
+.dark-mode{
+    background:#1e1e1e;
+    color:white;
+}
+.header{
+    display:flex; align-items:center; gap:15px;
+}
+.header img{
+    height:60px;
+    border-radius:10px;
+}
+table{
+    width:100%; border-collapse:collapse; margin-top:10px;
+}
+th,td{
+    border:1px solid #888; padding:6px;
+}
+button, select, input{
+    padding:6px; margin:5px;
+    border-radius:8px;
+    border:1px solid #3d6ef7;
+}
+button{
+    background:#3d6ef7; color:white; cursor:pointer;
+}
+button:hover{
+    background:#244ec4;
+}
+.progress{
+    width:300px;
+    height:15px;
+    background:#ddd;
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:10px;
+    display:none;
+}
+.progress-inner{
+    height:100%;
+    width:0;
+    background:#3d6ef7;
+}
+.dark-mode .progress{background:#444;}
+.dark-mode td, .dark-mode th{color:white; border-color:#666;}
+.card{
+    padding:10px;
+    background:white;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,.1);
+}
+.dark-mode .card{background:#2b2b2b;}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <img src="assets/logo.jpg">
+    <h2>Aplikasi Pencocokan Akun Belajar Siswa</h2>
+</div>
+
+<label>Upload Data Siswa:</label><br>
+<input type="file" id="fileSiswa"><br><br>
+
+<label>Upload Data Akun Belajar:</label><br>
+<input type="file" id="fileAkun"><br><br>
+
+<b>Email Guru: </b><input id="emailGuru" value="yanuar.bayu62@guru.smp.belajar.id" style="width:280px">
+<b> Website: </b><input id="webGuru" value="https://tik-smpn1moga.blogspot.com/" style="width:280px">
+
+<br><br>
+
+<button onclick="proses()">🔍 Cocokkan</button>
+<button onclick="toggleDark()">🌙 Dark Mode</button>
+
+<div class="progress" id="progressBar">
+    <div class="progress-inner" id="pIn"></div>
+</div>
+
+<br>
+<b>Filter Kelas:</b>
+<select id="filterKelas" onchange="filterKelas()">
+    <option value="all">Semua Kelas</option>
+</select>
+
+<button onclick="pilihSemua()">✅ Pilih Semua</button>
+<button onclick="hapusPilihan()">❌ Hapus Pilihan</button>
+<button onclick="downloadExcel()">⬇ Download Excel</button>
+<button onclick="downloadPDF()">⬇ Cetak Kartu</button>
+
+<br><br>
+<div id="status"></div>
+
+<table id="tabelHasil"></table>
+
+<script>
+let dataSiswa = [], dataAkun = [], hasilGabung = [], hasilFiltered = [];
+
+function readFile(file, cb){
+    let reader=new FileReader();
+    reader.onload= e =>{
+        let wb = XLSX.read(e.target.result,{type:'binary'});
+        cb(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1}));
+    };
+    reader.readAsBinaryString(file);
+}
+
+function progress(angka){
+    document.getElementById("progressBar").style.display="block";
+    document.getElementById("pIn").style.width=angka+"%";
+}
+
+function proses(){
+    progress(10);
+    readFile(document.getElementById("fileSiswa").files[0], rows1=>{
+        progress(30);
+        readFile(document.getElementById("fileAkun").files[0], rows2=>{
+            progress(60);
+            loadSiswa(rows1);
+            loadAkun(rows2);
+            cocokkan();
+            tampil(hasilGabung);
+            isiKelas();
+            progress(100);
+            setTimeout(()=>document.getElementById("progressBar").style.display="none",500);
+        });
+    });
+}
+
+function loadSiswa(rows){
+    dataSiswa=[];
+    for(let i=1;i<rows.length;i++){
+        if(rows[i][1]){
+            dataSiswa.push({
+                nama: rows[i][1].toString().trim().toLowerCase(),
+                tampil_nama: rows[i][1],
+                kelas: rows[i][2]
+            });
+        }
+    }
+}
+
+function loadAkun(rows){
+    dataAkun=[];
+    for(let i=1;i<rows.length;i++){
+        let nama = rows[i][8];
+        if(nama){
+            dataAkun.push({
+                nama: nama.toString().trim().toLowerCase(),
+                akun: rows[i][7],
+                pass: rows[i][14]
+            });
+        }
+    }
+}
+
+function cocokkan(){
+    hasilGabung=[];
+    let tanpaAkun=0;
+
+    dataSiswa.forEach(s=>{
+        let ketemu = dataAkun.find(a=>a.nama===s.nama);
+        if(!ketemu) tanpaAkun++;
+
+        hasilGabung.push({
+            cek:false,
+            Nama:s.tampil_nama,
+            Kelas:s.kelas,
+            Akun:ketemu ? ketemu.akun : "",
+            Password:ketemu ? ketemu.pass : ""
+        });
+    });
+
+    document.getElementById("status").innerHTML= 
+        `<b>Total siswa:</b> ${hasilGabung.length} | 
+         <b>Tidak punya akun:</b> ${tanpaAkun}`;
+}
+
+function tampil(list){
+    hasilFiltered=list;
+    let t=document.getElementById("tabelHasil");
+    let h=`<tr>
+        <th>Pilih</th><th>Nama</th><th>Kelas</th><th>Username</th><th>Password</th>
+    </tr>`;
+    list.forEach((r,i)=>{
+        h+=`<tr>
+            <td><input type="checkbox" ${r.cek?"checked":""} onclick="toggle(${i})"></td>
+            <td>${r.Nama}</td>
+            <td>${r.Kelas}</td>
+            <td>${r.Akun}</td>
+            <td>${r.Password}</td>
+        </tr>`;
+    });
+    t.innerHTML=h;
+}
+
+function toggle(i){
+    hasilFiltered[i].cek = !hasilFiltered[i].cek;
+}
+
+function isiKelas(){
+    let p=document.getElementById("filterKelas");
+    p.innerHTML=`<option value="all">Semua Kelas</option>`;
+    [...new Set(hasilGabung.map(i=>i.Kelas))].forEach(k=>{
+        let o=document.createElement("option");
+        o.value=k;o.textContent=k;p.appendChild(o);
+    });
+}
+
+function filterKelas(){
+    let k=document.getElementById("filterKelas").value;
+    if(k==="all") tampil(hasilGabung);
+    else tampil(hasilGabung.filter(a=>a.Kelas==k));
+}
+
+function pilihSemua(){
+    hasilFiltered.forEach(r=>r.cek=true);
+    tampil(hasilFiltered);
+}
+function hapusPilihan(){
+    hasilFiltered.forEach(r=>r.cek=false);
+    tampil(hasilFiltered);
+}
+
+/* ✅ Excel Sheet 2 benar 6 baris × 4 kolom */
+function downloadExcel(){
+    let pilih = hasilGabung.filter(x=>x.cek);
+    if(pilih.length===0) return alert("Pilih data dulu");
+
+    let s1 = XLSX.utils.json_to_sheet(pilih.map(r=>({
+        Nama:r.Nama,Kelas:r.Kelas,Username:r.Akun,Password:r.Password
+    })));
+
+    let ws2 = {};
+    let email=document.getElementById("emailGuru").value;
+    let web=document.getElementById("webGuru").value;
+
+    pilih.forEach((r,i)=>{
+        let col = i % 4;
+        let grup = Math.floor(i/4);
+        let rowAwal = 1 + grup*6;
+        let kolom = ["A","B","C","D"][col];
+
+        ws2[kolom + (rowAwal)]     = {v:r.Nama};
+        ws2[kolom + (rowAwal+1)]   = {v:r.Kelas};
+        ws2[kolom + (rowAwal+2)]   = {v:r.Akun};
+        ws2[kolom + (rowAwal+3)]   = {v:r.Password};
+        ws2[kolom + (rowAwal+4)]   = {v:email};
+        ws2[kolom + (rowAwal+5)]   = {v:web};
+    });
+
+    let maxRow = Math.ceil(pilih.length/4)*6;
+    ws2["!ref"] = `A1:D${maxRow}`;
+
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, s1, "Sheet1");
+    wb.Sheets["Sheet2"] = ws2;
+    wb.SheetNames.push("Sheet2");
+
+    XLSX.writeFile(wb, "Hasil_Pencocokan.xlsx");
+}
+
+/* ✅ CETAK KARTU LOGIN RAPI */
+function downloadPDF(){
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF("p", "mm", "a4");
+
+    let pilih = hasilGabung.filter(x=>x.cek);
+    if(pilih.length===0) return alert("Pilih data dulu!");
+
+    let email = emailGuru.value;
+    let web = webGuru.value;
+
+    let x = 10, y = 10;
+    let cardW = 90, cardH = 45;
+    let count = 0;
+
+    pilih.forEach((r,i)=>{
+        doc.rect(x, y, cardW, cardH);
+
+        doc.setFontSize(10);
+        doc.text(`Nama: ${r.Nama}`, x+4, y+8);
+        doc.text(`Kelas: ${r.Kelas}`, x+4, y+14);
+        doc.text(`Username: ${r.Akun}`, x+4, y+20);
+        doc.text(`Password: ${r.Password}`, x+4, y+26);
+        doc.text(`Email Guru: ${email}`, x+4, y+32);
+        doc.text(`Website: ${web}`, x+4, y+38);
+
+        x += cardW + 5;
+        count++;
+
+        if(count % 2 === 0){
+            x = 10;
+            y += cardH + 6;
+        }
+
+        if(y + cardH > 285){
+            doc.addPage();
+            x = 10; y = 10;
+        }
+    });
+
+    doc.save("Kartu_Login.pdf");
+}
+
+function toggleDark(){
+    document.body.classList.toggle("dark-mode");
+}
+</script>
+
+</body>
+</html>
