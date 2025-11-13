@@ -4,181 +4,240 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rekap Nilai Siswa</title>
-<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3039/3039525.png">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-  body { font-family: "Segoe UI", sans-serif; background:#f5f7fa; margin:0; padding:20px; }
-  h1 { text-align:center; margin-bottom:15px; color:#333; }
-  .card { background:white; padding:20px; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.1); max-width:1150px; margin:auto; }
-  .row { margin-bottom:10px; }
-  table { width:100%; border-collapse:collapse; margin-top:15px; }
-  th, td { border:1px solid #ccc; padding:6px; text-align:center; }
-  th { background:#0078d7; color:white; position:sticky; top:0; }
-  tr:nth-child(even){background:#fafafa;}
-  .btn { background:#0078d7; color:white; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; margin:3px; }
-  .btn:hover { background:#005fa3; }
-  .low { background:#ffbdbd !important; }
-  .empty { background:#fff6a3 !important; }
-  input[type='number'] { padding:4px; border:1px solid #ccc; border-radius:4px; }
-  .checkbox-container { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; background:#f8f8f8; padding:10px; border-radius:8px; }
-  label.checkbox-label { background:#e8eef7; padding:4px 8px; border-radius:4px; }
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background: #f9fafc;
+    margin: 0;
+    padding: 20px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #2563eb;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  }
+  header img {
+    height: 50px;
+    width: 50px;
+    border-radius: 10px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+  }
+  header p {
+    margin: 0;
+    font-size: 12px;
+    color: #e0e7ff;
+  }
+  section {
+    margin-top: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  select, input[type="number"], button {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin: 5px 0;
+  }
+  button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #1d4ed8;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    text-align: center;
+  }
+  th {
+    background: #f3f4f6;
+  }
+  .checkbox-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .bab-group {
+    background: #f9fafc;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .bab-group h4 {
+    margin: 0 0 5px;
+    color: #2563eb;
+  }
+  label {
+    display: block;
+    margin-left: 10px;
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>Rekap Nilai Siswa</h1><br/>
-  Version 1.1 (Build 13 November 2025)
-
-  <div class="row">
-    <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv">
-    <button class="btn" onclick="loadFile()">📂 Muat File</button>
+<header>
+  <img src="asset/logo.jpg" alt="Logo">
+  <div>
+    <h1>Aplikasi Rekap Nilai Siswa</h1>
+    <p>Version 1.0 (Update 2 November 2025) | Dev by MB</p>
   </div>
+</header>
 
-  <div class="row" id="sheetMenu" style="display:none;">
-    <label for="sheetSelect">Pilih Kelas (Sheet):</label>
-    <select id="sheetSelect"></select>
-    <button class="btn" onclick="loadSheet()">Tampilkan</button>
-  </div>
+<section>
+  <h3>Langkah 1: Upload File Excel</h3>
+  <input type="file" id="fileInput" accept=".xls,.xlsx,.csv"><br>
+  
+  <h3>Langkah 2: Pilih Kelas</h3>
+  <select id="sheetSelect"></select><br>
 
-  <div class="row" id="tpOptions" style="display:none;">
-    <label><input type="checkbox" id="checkAll" onclick="toggleAll(this)"> Pilih Semua TP</label>
-    <div class="checkbox-container" id="tpCheckboxes"></div>
-  </div>
+  <h3>Langkah 3: Atur KKM dan Pilih TP</h3>
+  <label>KKM: <input type="number" id="kkm" value="78" min="0" max="100"></label>
+  <div id="tpCheckboxContainer" class="checkbox-container"></div>
+  <button id="analyzeBtn">Tampilkan Data</button>
 
-  <div class="row">
-    <label>KKM:</label>
-    <input type="number" id="kkmInput" value="78" style="width:60px;">
-    <button class="btn" onclick="filterData()">Terapkan KKM</button>
-  </div>
-
-  <div id="tableContainer"></div>
-  <button class="btn" onclick="downloadExcel()" id="downloadBtn" style="display:none;">⬇️ Download Excel</button>
-</div>
-
-<!-- CDN XLSX -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <h3>Hasil Rekap</h3>
+  <div id="result"></div>
+  <button id="downloadBtn" style="display:none;">Download Excel</button>
+</section>
 
 <script>
-let workbook, currentSheetData = [];
-let selectedTPs = [];
+let workbook, selectedSheetName;
 
-const tpNames = [];
-for(let i=1;i<=5;i++){
-  for(let j=1;j<=4;j++){
-    tpNames.push(`BAB ${i} TP ${j}`);
-  }
-}
+document.getElementById('fileInput').addEventListener('change', handleFile);
 
-function loadFile(){
-  const file = document.getElementById("fileInput").files[0];
-  if(!file) return alert("Pilih file Excel atau CSV terlebih dahulu!");
-
+function handleFile(e) {
   const reader = new FileReader();
-  if(file.name.endsWith(".csv")){
-    reader.onload = e => parseCSV(e.target.result);
-    reader.readAsText(file);
-  } else {
-    reader.onload = e => {
-      const data = new Uint8Array(e.target.result);
-      workbook = XLSX.read(data, {type:'array'});
-      const sheetSelect = document.getElementById("sheetSelect");
-      sheetSelect.innerHTML = "";
-      workbook.SheetNames.forEach(n=>{
-        const opt = document.createElement("option");
-        opt.value=n; opt.textContent=n;
-        sheetSelect.appendChild(opt);
-      });
-      document.getElementById("sheetMenu").style.display="block";
-      showTPCheckboxes();
-      alert("File berhasil dimuat! Pilih kelas untuk ditampilkan.");
-    };
-    reader.readAsArrayBuffer(file);
-  }
+  reader.onload = function(event) {
+    const data = new Uint8Array(event.target.result);
+    workbook = XLSX.read(data, { type: 'array' });
+    const sheetSelect = document.getElementById('sheetSelect');
+    sheetSelect.innerHTML = "";
+    workbook.SheetNames.forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      sheetSelect.appendChild(opt);
+    });
+    createTPCheckboxes();
+  };
+  reader.readAsArrayBuffer(e.target.files[0]);
 }
 
-function parseCSV(csv){
-  const rows = csv.trim().split(/\r?\n/).slice(9);
-  const data = rows.map(r => r.split(";"));
-  workbook = {Sheets:{"CSV File":data}, SheetNames:["CSV File"], isCSV:true};
-  document.getElementById("sheetSelect").innerHTML="<option>CSV File</option>";
-  document.getElementById("sheetMenu").style.display="block";
-  showTPCheckboxes();
-  alert("File CSV berhasil dimuat!");
-}
-
-function showTPCheckboxes(){
-  const container = document.getElementById("tpCheckboxes");
+function createTPCheckboxes() {
+  const container = document.getElementById("tpCheckboxContainer");
   container.innerHTML = "";
-  tpNames.forEach((tp, index)=>{
-    const id = "tp_"+index;
-    container.innerHTML += `<label class='checkbox-label'><input type='checkbox' id='${id}' value='${index}' checked> ${tp}</label>`;
-  });
-  document.getElementById("tpOptions").style.display="block";
-}
+  for (let bab = 1; bab <= 5; bab++) {
+    const group = document.createElement("div");
+    group.className = "bab-group";
+    const title = document.createElement("h4");
+    title.textContent = `BAB ${bab}`;
+    group.appendChild(title);
 
-function toggleAll(master){
-  const checkboxes = document.querySelectorAll("#tpCheckboxes input[type='checkbox']");
-  checkboxes.forEach(c=>c.checked = master.checked);
-}
-
-function loadSheet(){
-  const name = document.getElementById("sheetSelect").value;
-  const kkm = parseFloat(document.getElementById("kkmInput").value) || 78;
-  if(workbook.isCSV){
-    currentSheetData = workbook.Sheets["CSV File"];
-  } else {
-    const sheet = workbook.Sheets[name];
-    currentSheetData = XLSX.utils.sheet_to_json(sheet, {header:1});
-  }
-  selectedTPs = Array.from(document.querySelectorAll("#tpCheckboxes input:checked")).map(c=>parseInt(c.value));
-  renderTable(currentSheetData, kkm);
-}
-
-function renderTable(data, kkm){
-  const startRow = 9;
-  const rows = data.slice(startRow).filter(r => r[1]);
-  const html = [];
-  html.push(`<table><thead><tr><th>No</th><th>Nama</th>`);
-  selectedTPs.forEach(i=>{
-    html.push(`<th>${tpNames[i]}</th>`);
-  });
-  html.push(`</tr></thead><tbody>`);
-  let no=1;
-  rows.forEach(r=>{
-    const nilai = r.slice(2,22);
-    const filtered = selectedTPs.map(i=>nilai[i]);
-    const hasLow = filtered.some(v=>!v || parseFloat(v)<kkm);
-    if(hasLow){
-      html.push(`<tr><td>${no++}</td><td>${r[1]||''}</td>`);
-      selectedTPs.forEach(i=>{
-        const v = nilai[i];
-        if(!v) html.push(`<td class='empty'></td>`);
-        else if(parseFloat(v)<kkm) html.push(`<td class='low'>${v}</td>`);
-        else html.push(`<td>${v}</td>`);
-      });
-      html.push(`</tr>`);
+    for (let tp = 1; tp <= 4; tp++) {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = `BAB ${bab} TP ${tp}`;
+      checkbox.checked = true;
+      label.appendChild(checkbox);
+      label.append(` TP ${tp}`);
+      group.appendChild(label);
     }
+    container.appendChild(group);
+  }
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', analyzeData);
+
+function analyzeData() {
+  selectedSheetName = document.getElementById("sheetSelect").value;
+  const sheet = workbook.Sheets[selectedSheetName];
+  const kkm = parseFloat(document.getElementById("kkm").value);
+  const selectedTP = Array.from(document.querySelectorAll("#tpCheckboxContainer input:checked")).map(cb => cb.value);
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  
+  const results = [];
+  for (let i = 9; i < data.length; i++) {
+    const row = data[i];
+    const nama = row[1];
+    if (!nama) break; // berhenti kalau nama kosong
+    
+    const nilaiTP = row.slice(2, 22); // C sampai V
+    let tampil = false;
+    let detail = {};
+
+    selectedTP.forEach((label, index) => {
+      const colIndex = (parseInt(label.match(/BAB (\d) TP (\d)/)[1]) - 1) * 4 + (parseInt(label.match(/TP (\d)/)[1]) - 1);
+      const nilai = parseFloat(nilaiTP[colIndex]);
+      if (isNaN(nilai) || nilai < kkm) {
+        tampil = true;
+        detail[label] = nilai || "";
+      }
+    });
+
+    if (tampil) {
+      results.push({ nama, ...detail });
+    }
+  }
+
+  renderTable(results, selectedTP, kkm);
+}
+
+function renderTable(results, selectedTP, kkm) {
+  const container = document.getElementById("result");
+  if (results.length === 0) {
+    container.innerHTML = "<p>Tidak ada siswa yang nilainya kosong atau di bawah KKM.</p>";
+    document.getElementById("downloadBtn").style.display = "none";
+    return;
+  }
+
+  let html = "<table><thead><tr><th>Nama</th>";
+  selectedTP.forEach(tp => html += `<th>${tp}</th>`);
+  html += "</tr></thead><tbody>";
+
+  results.forEach(r => {
+    html += `<tr><td>${r.nama}</td>`;
+    selectedTP.forEach(tp => {
+      const val = r[tp] ?? "";
+      html += `<td style="color:${val===""||val<kkm?'red':'black'}">${val}</td>`;
+    });
+    html += "</tr>";
   });
-  html.push(`</tbody></table>`);
-  document.getElementById("tableContainer").innerHTML = html.join("");
-  document.getElementById("downloadBtn").style.display="inline-block";
+  html += "</tbody></table>";
+  
+  container.innerHTML = html;
+  document.getElementById("downloadBtn").style.display = "inline-block";
+  document.getElementById("downloadBtn").onclick = () => downloadExcel(results, selectedTP);
 }
 
-function filterData(){
-  if(!currentSheetData.length) return alert("Muat data terlebih dahulu.");
-  selectedTPs = Array.from(document.querySelectorAll("#tpCheckboxes input:checked")).map(c=>parseInt(c.value));
-  const kkm = parseFloat(document.getElementById("kkmInput").value) || 78;
-  renderTable(currentSheetData, kkm);
-}
-
-function downloadExcel(){
-  const table = document.querySelector("#tableContainer table");
-  if(!table) return alert("Tidak ada data untuk diunduh!");
-  const ws = XLSX.utils.table_to_sheet(table);
+function downloadExcel(results, selectedTP) {
+  const data = [["Nama", ...selectedTP]];
+  results.forEach(r => {
+    data.push([r.nama, ...selectedTP.map(tp => r[tp] || "")]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-  XLSX.writeFile(wb, "Rekap_Nilai_Bermasalah.xlsx");
+  XLSX.writeFile(wb, "rekap_nilai.xlsx");
 }
 </script>
 </body>
 </html>
-
