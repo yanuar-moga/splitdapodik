@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rekap Nilai Siswa</title>
+<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3039/3039525.png">
+<style>
+  body { font-family: "Segoe UI", sans-serif; background:#f5f7fa; margin:0; padding:20px; }
+  h1 { text-align:center; margin-bottom:15px; color:#333; }
+  .card { background:white; padding:20px; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.1); max-width:1150px; margin:auto; }
+  .row { margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; margin-top:15px; }
+  th, td { border:1px solid #ccc; padding:6px; text-align:center; }
+  th { background:#0078d7; color:white; position:sticky; top:0; }
+  tr:nth-child(even){background:#fafafa;}
+  .btn { background:#0078d7; color:white; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; margin:3px; }
+  .btn:hover { background:#005fa3; }
+  .low { background:#ffbdbd !important; }
+  .empty { background:#fff6a3 !important; }
+  input[type='number'] { padding:4px; border:1px solid #ccc; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📘 Rekap Nilai Siswa</h1>
+
+  <div class="row">
+    <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv">
+    <button class="btn" onclick="loadFile()">📂 Muat File</button>
+  </div>
+
+  <div class="row" id="sheetMenu" style="display:none;">
+    <label for="sheetSelect">Pilih Kelas (Sheet):</label>
+    <select id="sheetSelect"></select>
+    <button class="btn" onclick="loadSheet()">Tampilkan</button>
+  </div>
+
+  <div class="row">
+    <label>KKM:</label>
+    <input type="number" id="kkmInput" value="78" style="width:60px;">
+    <button class="btn" onclick="filterData()">Terapkan KKM</button>
+  </div>
+
+  <div id="tableContainer"></div>
+  <button class="btn" onclick="downloadExcel()" id="downloadBtn" style="display:none;">⬇️ Download Excel</button>
+</div>
+
+<!-- CDN XLSX -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+let workbook, currentSheetData = [];
+
+function loadFile(){
+  const file = document.getElementById("fileInput").files[0];
+  if(!file) return alert("Pilih file Excel atau CSV terlebih dahulu!");
+
+  const reader = new FileReader();
+  if(file.name.endsWith(".csv")){
+    reader.onload = e => parseCSV(e.target.result);
+    reader.readAsText(file);
+  } else {
+    reader.onload = e => {
+      const data = new Uint8Array(e.target.result);
+      workbook = XLSX.read(data, {type:'array'});
+      const sheetSelect = document.getElementById("sheetSelect");
+      sheetSelect.innerHTML = "";
+      workbook.SheetNames.forEach(n=>{
+        const opt = document.createElement("option");
+        opt.value=n; opt.textContent=n;
+        sheetSelect.appendChild(opt);
+      });
+      document.getElementById("sheetMenu").style.display="block";
+      alert("File berhasil dimuat! Pilih kelas untuk ditampilkan.");
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function parseCSV(csv){
+  const rows = csv.trim().split(/\r?\n/).slice(9); // mulai baris ke-10
+  const data = rows.map(r => r.split(";"));
+  workbook = {Sheets:{"CSV File":data}, SheetNames:["CSV File"], isCSV:true};
+  document.getElementById("sheetSelect").innerHTML="<option>CSV File</option>";
+  document.getElementById("sheetMenu").style.display="block";
+  alert("File CSV berhasil dimuat!");
+}
+
+function loadSheet(){
+  const name = document.getElementById("sheetSelect").value;
+  const kkm = parseFloat(document.getElementById("kkmInput").value) || 78;
+  if(workbook.isCSV){
+    currentSheetData = workbook.Sheets["CSV File"];
+  } else {
+    const sheet = workbook.Sheets[name];
+    currentSheetData = XLSX.utils.sheet_to_json(sheet, {header:1});
+  }
+  renderTable(currentSheetData, kkm);
+}
+
+function renderTable(data, kkm){
+  const startRow = 9; // baris ke-10
+  const rows = data.slice(startRow).filter(r => r[1]);
+  const html = [];
+  html.push(`<table><thead><tr><th>No</th><th>Nama</th>`);
+  for(let i=0;i<5;i++){
+    for(let j=0;j<4;j++){
+      html.push(`<th>BAB ${i+1} TP ${j+1}</th>`);
+    }
+  }
+  html.push(`</tr></thead><tbody>`);
+  let no=1;
+  rows.forEach(r=>{
+    const nilai = r.slice(2,22); // C sampai V
+    const hasLow = nilai.some(v=>!v || parseFloat(v)<kkm);
+    if(hasLow){
+      html.push(`<tr><td>${no++}</td><td>${r[1]||''}</td>`);
+      nilai.forEach(v=>{
+        if(!v) html.push(`<td class='empty'></td>`);
+        else if(parseFloat(v)<kkm) html.push(`<td class='low'>${v}</td>`);
+        else html.push(`<td>${v}</td>`);
+      });
+      html.push(`</tr>`);
+    }
+  });
+  html.push(`</tbody></table>`);
+  document.getElementById("tableContainer").innerHTML = html.join("");
+  document.getElementById("downloadBtn").style.display="inline-block";
+}
+
+function filterData(){
+  if(!currentSheetData.length) return alert("Muat data terlebih dahulu.");
+  const kkm = parseFloat(document.getElementById("kkmInput").value) || 78;
+  renderTable(currentSheetData, kkm);
+}
+
+function downloadExcel(){
+  const table = document.querySelector("#tableContainer table");
+  if(!table) return alert("Tidak ada data untuk diunduh!");
+  const ws = XLSX.utils.table_to_sheet(table);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Rekap");
+  XLSX.writeFile(wb, "Rekap_Nilai_Bermasalah.xlsx");
+}
+</script>
+</body>
+</html>
