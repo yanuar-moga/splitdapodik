@@ -90,6 +90,12 @@
     display: block;
     margin-left: 10px;
   }
+  .tp-controls {
+    margin: 10px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 </style>
 </head>
 <body>
@@ -110,6 +116,14 @@
 
   <h3>Langkah 3: Atur KKM dan Pilih TP</h3>
   <label>KKM: <input type="number" id="kkm" value="78" min="0" max="100"></label>
+
+  <div class="tp-controls">
+    <button type="button" onclick="checkAll(true)">✔ Ceklis Semua</button>
+    <button type="button" onclick="checkAll(false)">✖ Hapus Semua</button>
+    <button type="button" onclick="checkTPPattern(1)">TP1</button>
+    <button type="button" onclick="checkTPPattern(2)">TP1 & TP2</button>
+  </div>
+
   <div id="tpCheckboxContainer" class="checkbox-container"></div>
   <button id="analyzeBtn">Tampilkan Data</button>
 
@@ -165,6 +179,17 @@ function createTPCheckboxes() {
   }
 }
 
+function checkAll(state) {
+  document.querySelectorAll("#tpCheckboxContainer input[type=checkbox]").forEach(cb => cb.checked = state);
+}
+
+function checkTPPattern(tpLimit) {
+  document.querySelectorAll("#tpCheckboxContainer input[type=checkbox]").forEach(cb => {
+    const tp = parseInt(cb.value.match(/TP (\d)/)[1]);
+    cb.checked = tp <= tpLimit;
+  });
+}
+
 document.getElementById('analyzeBtn').addEventListener('click', analyzeData);
 
 function analyzeData() {
@@ -184,8 +209,9 @@ function analyzeData() {
     let tampil = false;
     let detail = {};
 
-    selectedTP.forEach((label, index) => {
-      const colIndex = (parseInt(label.match(/BAB (\d) TP (\d)/)[1]) - 1) * 4 + (parseInt(label.match(/TP (\d)/)[1]) - 1);
+    selectedTP.forEach(label => {
+      const [bab, tp] = label.match(/BAB (\d) TP (\d)/).slice(1).map(Number);
+      const colIndex = (bab - 1) * 4 + (tp - 1);
       const nilai = parseFloat(nilaiTP[colIndex]);
       if (isNaN(nilai) || nilai < kkm) {
         tampil = true;
@@ -193,9 +219,7 @@ function analyzeData() {
       }
     });
 
-    if (tampil) {
-      results.push({ nama, ...detail });
-    }
+    if (tampil) results.push({ nama, ...detail });
   }
 
   renderTable(results, selectedTP, kkm);
