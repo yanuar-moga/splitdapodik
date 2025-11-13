@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rekap Nilai Siswa</title>
+<title>Analisis Nilai Siswa</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   body {
@@ -99,7 +99,7 @@
   }
   textarea {
     width: 100%;
-    height: 120px;
+    height: 150px;
     margin-top: 10px;
     background: #f9fafc;
   }
@@ -109,7 +109,7 @@
 <header>
   <img src="asset/logo.jpg" alt="Logo">
   <div>
-    <h1>Rekap Perbaikan Nilai Siswa </h1>
+    <h1>Analisis Nilai Siswa</h1>
     <p>Versi 1.0 (Build 13 November 2025) Dev by MB</p>
   </div>
 </header>
@@ -139,7 +139,7 @@
   <button id="downloadBtn" style="display:none;">Download Excel</button>
 
   <h3>Daftar Nama untuk Dikirim ke WA</h3>
-  <textarea id="waText" readonly placeholder="Daftar nama dan TP akan muncul di sini setelah menampilkan data..."></textarea>
+  <textarea id="waText" readonly placeholder="Daftar nama dan link asesmen akan muncul di sini setelah menampilkan data..."></textarea>
 </section>
 
 <script>
@@ -208,40 +208,64 @@ function analyzeData() {
   const kkm = parseFloat(document.getElementById("kkm").value);
   const selectedTP = Array.from(document.querySelectorAll("#tpCheckboxContainer input:checked")).map(cb => cb.value);
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  
+
   const results = [];
-  const waList = [];
+  const waMap = {};
+
   for (let i = 9; i < data.length; i++) {
     const row = data[i];
     const nama = row[1];
     if (!nama) break;
-    
+
     const nilaiTP = row.slice(2, 22);
-    let tampil = false;
-    let detail = {};
-    let kosongAtauRendah = [];
+    const detail = {};
+    const perbaikan = [];
 
     selectedTP.forEach(label => {
       const [bab, tp] = label.match(/BAB (\d) TP (\d)/).slice(1).map(Number);
       const colIndex = (bab - 1) * 4 + (tp - 1);
       const nilai = parseFloat(nilaiTP[colIndex]);
       if (isNaN(nilai) || nilai < kkm) {
-        tampil = true;
         detail[label] = nilai || "";
-        kosongAtauRendah.push(label);
+        perbaikan.push(label);
       }
     });
 
-    if (tampil) {
+    if (perbaikan.length > 0) {
       results.push({ nama, ...detail });
-      waList.push(`${nama} → ${kosongAtauRendah.join(", ")}`);
+
+      perbaikan.forEach(tp => {
+        const babMatch = tp.match(/BAB (\d)/);
+        if (!babMatch) return;
+        const bab = `BAB ${babMatch[1]}`;
+        let link = "";
+        if (bab.includes("BAB 3")) link = "https://look.short.gy/asesmenbab3";
+        else if (bab.includes("BAB 4")) link = "https://look.short.gy/asesmenbab4";
+        else if (bab.includes("BAB 5")) link = "https://look.short.gy/asesmenbab5";
+
+        if (!waMap[nama]) waMap[nama] = new Set();
+        waMap[nama].add(`${bab} → link perbaikan nilai: ${link}`);
+      });
     }
   }
 
+  const sortedNames = Object.keys(waMap).sort((a, b) => a.localeCompare(b, "id"));
+  let waText = "Berikut daftar siswa yang perlu mengulang asesmen:\n\n";
+  sortedNames.forEach((nama, index) => {
+    waText += `${index + 1}. ${nama.toUpperCase()}\n`;
+    const list = Array.from(waMap[nama]);
+    list.forEach(babText => {
+      waText += `   - Mengulang ${babText}\n`;
+    });
+    waText += "\n";
+  });
+
+  if (sortedNames.length === 0) {
+    waText = "Semua siswa sudah tuntas. 👍";
+  }
+
   renderTable(results, selectedTP, kkm);
-  document.getElementById("waText").value = waList.length > 0 
-    ? "Berikut daftar siswa yang masih perlu perbaikan nilai:\n\n" + waList.join("\n")
-    : "Semua siswa sudah tuntas. 👍";
+  document.getElementById("waText").value = waText.trim();
 }
 
 function renderTable(results, selectedTP, kkm) {
