@@ -19,6 +19,8 @@
   .low { background:#ffbdbd !important; }
   .empty { background:#fff6a3 !important; }
   input[type='number'] { padding:4px; border:1px solid #ccc; border-radius:4px; }
+  .checkbox-container { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; background:#f8f8f8; padding:10px; border-radius:8px; }
+  label.checkbox-label { background:#e8eef7; padding:4px 8px; border-radius:4px; }
 </style>
 </head>
 <body>
@@ -36,6 +38,11 @@
     <button class="btn" onclick="loadSheet()">Tampilkan</button>
   </div>
 
+  <div class="row" id="tpOptions" style="display:none;">
+    <label><input type="checkbox" id="checkAll" onclick="toggleAll(this)"> Pilih Semua TP</label>
+    <div class="checkbox-container" id="tpCheckboxes"></div>
+  </div>
+
   <div class="row">
     <label>KKM:</label>
     <input type="number" id="kkmInput" value="78" style="width:60px;">
@@ -51,6 +58,14 @@
 
 <script>
 let workbook, currentSheetData = [];
+let selectedTPs = [];
+
+const tpNames = [];
+for(let i=1;i<=5;i++){
+  for(let j=1;j<=4;j++){
+    tpNames.push(`BAB ${i} TP ${j}`);
+  }
+}
 
 function loadFile(){
   const file = document.getElementById("fileInput").files[0];
@@ -72,6 +87,7 @@ function loadFile(){
         sheetSelect.appendChild(opt);
       });
       document.getElementById("sheetMenu").style.display="block";
+      showTPCheckboxes();
       alert("File berhasil dimuat! Pilih kelas untuk ditampilkan.");
     };
     reader.readAsArrayBuffer(file);
@@ -79,12 +95,28 @@ function loadFile(){
 }
 
 function parseCSV(csv){
-  const rows = csv.trim().split(/\r?\n/).slice(9); // mulai baris ke-10
+  const rows = csv.trim().split(/\r?\n/).slice(9);
   const data = rows.map(r => r.split(";"));
   workbook = {Sheets:{"CSV File":data}, SheetNames:["CSV File"], isCSV:true};
   document.getElementById("sheetSelect").innerHTML="<option>CSV File</option>";
   document.getElementById("sheetMenu").style.display="block";
+  showTPCheckboxes();
   alert("File CSV berhasil dimuat!");
+}
+
+function showTPCheckboxes(){
+  const container = document.getElementById("tpCheckboxes");
+  container.innerHTML = "";
+  tpNames.forEach((tp, index)=>{
+    const id = "tp_"+index;
+    container.innerHTML += `<label class='checkbox-label'><input type='checkbox' id='${id}' value='${index}' checked> ${tp}</label>`;
+  });
+  document.getElementById("tpOptions").style.display="block";
+}
+
+function toggleAll(master){
+  const checkboxes = document.querySelectorAll("#tpCheckboxes input[type='checkbox']");
+  checkboxes.forEach(c=>c.checked = master.checked);
 }
 
 function loadSheet(){
@@ -96,27 +128,28 @@ function loadSheet(){
     const sheet = workbook.Sheets[name];
     currentSheetData = XLSX.utils.sheet_to_json(sheet, {header:1});
   }
+  selectedTPs = Array.from(document.querySelectorAll("#tpCheckboxes input:checked")).map(c=>parseInt(c.value));
   renderTable(currentSheetData, kkm);
 }
 
 function renderTable(data, kkm){
-  const startRow = 9; // baris ke-10
+  const startRow = 9;
   const rows = data.slice(startRow).filter(r => r[1]);
   const html = [];
   html.push(`<table><thead><tr><th>No</th><th>Nama</th>`);
-  for(let i=0;i<5;i++){
-    for(let j=0;j<4;j++){
-      html.push(`<th>BAB ${i+1} TP ${j+1}</th>`);
-    }
-  }
+  selectedTPs.forEach(i=>{
+    html.push(`<th>${tpNames[i]}</th>`);
+  });
   html.push(`</tr></thead><tbody>`);
   let no=1;
   rows.forEach(r=>{
-    const nilai = r.slice(2,22); // C sampai V
-    const hasLow = nilai.some(v=>!v || parseFloat(v)<kkm);
+    const nilai = r.slice(2,22);
+    const filtered = selectedTPs.map(i=>nilai[i]);
+    const hasLow = filtered.some(v=>!v || parseFloat(v)<kkm);
     if(hasLow){
       html.push(`<tr><td>${no++}</td><td>${r[1]||''}</td>`);
-      nilai.forEach(v=>{
+      selectedTPs.forEach(i=>{
+        const v = nilai[i];
         if(!v) html.push(`<td class='empty'></td>`);
         else if(parseFloat(v)<kkm) html.push(`<td class='low'>${v}</td>`);
         else html.push(`<td>${v}</td>`);
@@ -131,6 +164,7 @@ function renderTable(data, kkm){
 
 function filterData(){
   if(!currentSheetData.length) return alert("Muat data terlebih dahulu.");
+  selectedTPs = Array.from(document.querySelectorAll("#tpCheckboxes input:checked")).map(c=>parseInt(c.value));
   const kkm = parseFloat(document.getElementById("kkmInput").value) || 78;
   renderTable(currentSheetData, kkm);
 }
