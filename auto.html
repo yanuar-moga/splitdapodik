@@ -41,7 +41,6 @@ th { background:#333; color:white; }
 
 <script>
 // ======= KONFIGURASI =======
-// Mapping sheet siswa per kelas
 const gidPerKelas = {
   "7A": "195602539",
   "7B": "614617083",
@@ -54,7 +53,6 @@ const gidPerKelas = {
   "7I": "304301086"
 };
 
-// Mapping Asesmen → gid Form Responses
 const asesmenPerGid = {
   "Asesmen Bab 3": "761163956",
   "Asesmen Bab 4": "1943120001",
@@ -74,19 +72,41 @@ Object.keys(gidPerKelas).forEach(k => {
 const asesmenSelect = document.getElementById("asesmenSelect");
 Object.keys(asesmenPerGid).forEach(a => {
   const option = document.createElement("option");
-  option.value = asesmenPerGid[a];  // pakai gid
+  option.value = asesmenPerGid[a];
   option.text = a;
   asesmenSelect.appendChild(option);
 });
 
-// ======= Fungsi CSV =======
-async function loadCSV(url){
-  const res = await fetch(url);
-  const txt = await res.text();
-  return txt.trim().split("\n").map(r => r.split(","));
+// ======= Parser CSV Aman =======
+function parseCSV(text){
+  const lines = text.trim().split("\n");
+  return lines.map(line => {
+    const row = [];
+    let cur = "";
+    let inQuotes = false;
+    for(let i=0;i<line.length;i++){
+      const ch = line[i];
+      if(ch === '"') inQuotes = !inQuotes;
+      else if(ch === ',' && !inQuotes){
+        row.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    row.push(cur);
+    return row;
+  });
 }
 
-// ======= Fungsi Load Data =======
+// ======= Load CSV =======
+async function loadCSV(url){
+  const res = await fetch(url);
+  const text = await res.text();
+  return parseCSV(text);
+}
+
+// ======= Load Data =======
 async function loadData(){
   const kkm = parseInt(document.getElementById("kkm").value);
   const kelasTerpilih = kelasSelect.value;
@@ -109,13 +129,11 @@ async function loadData(){
   let respons = await loadCSV(LINK_RESPONS_CSV);
   respons.shift(); // hapus header
   respons.forEach(r=>{
-    let rawScore = r[1]?.replace(/"/g,"").trim(); // kolom B = nilai
-    let rawNama = r[2]?.replace(/"/g,"").trim();  // kolom C = nama
+    let rawScore = r[1]?.trim(); // kolom B = nilai
+    let rawNama = r[2]?.trim();  // kolom C = nama
 
     // Ambil angka sebelum '/'
-    if(rawScore.includes("/")){
-      rawScore = rawScore.split("/")[0].trim();
-    }
+    if(rawScore && rawScore.includes("/")) rawScore = rawScore.split("/")[0].trim();
 
     const score = parseInt(rawScore);
     const nama = rawNama;
