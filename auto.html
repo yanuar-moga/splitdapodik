@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rekap Nilai Siswa</title>
 <style>
 body { font-family: Arial; padding:20px; background:#f4f4f4; }
@@ -37,101 +37,105 @@ th { background:#333; color:white; }
 </div>
 
 <script>
-// ======= KONFIGURASI GOOGLE SHEET =======
-const LINK_SISWA_CSV = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=195602539";
+// ======= KONFIGURASI =======
+// Mapping nama sheet → gid sheet masing-masing
+const gidPerKelas = {
+  "7A": "195602539",
+  "7B": "234567890",
+  "7C": "345678901",
+  // Tambahkan sheet lain sesuai kebutuhan
+};
+
+// Link form respons (nilai)
 const LINK_RESPONS_CSV = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001";
 
-// ======= LIST KELAS (JSON STATIS) =======
-const daftarKelas = ["7A","7B","7C","7D","7E","7F","7G","7H","7I",
-                     "8A","8B","8C","8D","8E","8F","8G","8H","8I",
-                     "9A","9B","9C","9D","9E","9F","9G","9H","9I"];
-
+// ======= Populate dropdown kelas =======
 const kelasSelect = document.getElementById("kelasSelect");
-
-// Populate dropdown kelas
-daftarKelas.forEach(k => {
-    const option = document.createElement("option");
-    option.value = k;
-    option.text = k;
-    kelasSelect.appendChild(option);
+Object.keys(gidPerKelas).forEach(k => {
+  const option = document.createElement("option");
+  option.value = k;
+  option.text = k;
+  kelasSelect.appendChild(option);
 });
 
-// ======= FUNGSI UTAMA =======
+// ======= Fungsi CSV =======
 async function loadCSV(url){
-    const res = await fetch(url);
-    const txt = await res.text();
-    return txt.trim().split("\n").map(r => r.split(","));
+  const res = await fetch(url);
+  const txt = await res.text();
+  return txt.trim().split("\n").map(r => r.split(","));
 }
 
+// ======= Fungsi Load Data =======
 async function loadData(){
-    const kkm = parseInt(document.getElementById("kkm").value);
-    const kelasTerpilih = kelasSelect.value;
-    if(!kelasTerpilih){ alert("Pilih kelas dulu!"); return; }
+  const kkm = parseInt(document.getElementById("kkm").value);
+  const kelasTerpilih = kelasSelect.value;
+  if(!kelasTerpilih){ alert("Pilih kelas dulu!"); return; }
 
-    document.getElementById("output").innerHTML = "Memuat data kelas "+kelasTerpilih+"…";
+  document.getElementById("output").innerHTML = "Memuat data kelas "+kelasTerpilih+"…";
 
-    // --- Ambil daftar siswa ---
-    let siswa = await loadCSV(LINK_SISWA_CSV);
-    siswa.shift(); // hapus header
+  const gidSiswa = gidPerKelas[kelasTerpilih];
+  const LINK_SISWA_CSV = `https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=${gidSiswa}`;
 
-    // Semua siswa dimuat, urut sesuai sheet
-    let dataSiswa = siswa.map(r => ({ no:r[0], nama:r[1].trim(), scoreAkhir:"", riwayat:[] }));
+  // Ambil data siswa
+  let siswa = await loadCSV(LINK_SISWA_CSV);
+  siswa.shift(); // hapus header
+  let dataSiswa = siswa.map(r => ({ no:r[0], nama:r[1].trim(), scoreAkhir:"", riwayat:[] }));
 
-    // --- Ambil respons form ---
-    let respons = await loadCSV(LINK_RESPONS_CSV);
-    respons.shift(); // hapus header
+  // Ambil respons form
+  let respons = await loadCSV(LINK_RESPONS_CSV);
+  respons.shift(); // hapus header
+  respons.forEach(r=>{
+    const score = parseInt(r[1]);
+    const nama = r[2]?.trim();
+    if(!nama || isNaN(score)) return;
 
-    // Format: Nilai kolom B (1), Nama kolom C (2)
-    respons.forEach(r=>{
-        const score = parseInt(r[1]);
-        const nama = r[2]?.trim();
-        if(!nama || isNaN(score)) return;
+    let target = dataSiswa.find(s=>s.nama.toLowerCase()===nama.toLowerCase());
+    if(target) target.riwayat.push(score);
+  });
 
-        let target = dataSiswa.find(s=>s.nama.toLowerCase()===nama.toLowerCase());
-        if(target) target.riwayat.push(score);
-    });
+  // Hitung Score Akhir
+  dataSiswa.forEach(s=>{
+    if(s.riwayat.length>0) s.scoreAkhir = s.riwayat[s.riwayat.length-1];
+  });
 
-    // Score akhir = nilai terakhir
-    dataSiswa.forEach(s=>{
-        if(s.riwayat.length>0) s.scoreAkhir = s.riwayat[s.riwayat.length-1];
-    });
+  // ======= Bangun tabel =======
+  let html = `<h3>Data Kelas: ${kelasTerpilih}</h3>`;
+  html += "<table><tr><th>No</th><th>Nama Siswa</th><th>Score Akhir</th>";
+  let maxRiwayat = Math.max(...dataSiswa.map(s=>s.riwayat.length));
+  for(let i=1;i<=maxRiwayat;i++){ html += `<th>Score ${i}</th>`; }
+  html += "</tr>";
 
-    // ======= BANGUN TABEL =======
-    let html = `<h3>Data Kelas: ${kelasTerpilih}</h3>`;
-    html += "<table><tr>";
-    html += "<th>No</th><th>Nama Siswa</th><th>Score Akhir</th>";
-    let maxRiwayat = Math.max(...dataSiswa.map(s=>s.riwayat.length));
-    for(let i=1;i<=maxRiwayat;i++){ html += `<th>Score ${i}</th>`; }
+  dataSiswa.forEach(s=>{
+    html += "<tr>";
+    html += `<td>${s.no}</td>`;
+    html += `<td>${s.nama}</td>`;
+    let akhirClass = s.scoreAkhir === "" ? "" : (s.scoreAkhir>kkm ? "hijau": s.scoreAkhir==kkm?"kuning":"merah");
+    html += `<td class="${akhirClass}">${s.scoreAkhir}</td>`;
+
+    for(let i=0;i<maxRiwayat;i++){
+      let nilai = s.riwayat[i] ?? "";
+      let cls = nilai === "" ? "" : (nilai>kkm?"hijau":nilai==kkm?"kuning":"merah");
+      html += `<td class="${cls}">${nilai}</td>`;
+    }
     html += "</tr>";
+  });
 
-    dataSiswa.forEach(s=>{
-        html += "<tr>";
-        html += `<td>${s.no}</td>`;
-        html += `<td>${s.nama}</td>`;
-
-        let akhirClass = s.scoreAkhir === "" ? "" : (s.scoreAkhir>kkm ? "hijau": s.scoreAkhir==kkm?"kuning":"merah");
-        html += `<td class="${akhirClass}">${s.scoreAkhir}</td>`;
-
-        for(let i=0;i<maxRiwayat;i++){
-            let nilai = s.riwayat[i] ?? "";
-            let cls = nilai === "" ? "" : (nilai>kkm?"hijau":nilai==kkm?"kuning":"merah");
-            html += `<td class="${cls}">${nilai}</td>`;
-        }
-
-        html += "</tr>";
-    });
-
-    html += "</table>";
-    document.getElementById("output").innerHTML = html;
-    document.getElementById("downloadArea").style.display="block";
+  html += "</table>";
+  document.getElementById("output").innerHTML = html;
+  document.getElementById("downloadArea").style.display="block";
 }
 
-// ======= DOWNLOAD =======
+// ======= Download =======
 function downloadExcel(){
-    window.open(`https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=xlsx`);
+  const kelasTerpilih = kelasSelect.value;
+  const gidSiswa = gidPerKelas[kelasTerpilih];
+  window.open(`https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=xlsx&gid=${gidSiswa}`);
 }
+
 function downloadPDF(){
-    window.open(`https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=pdf`);
+  const kelasTerpilih = kelasSelect.value;
+  const gidSiswa = gidPerKelas[kelasTerpilih];
+  window.open(`https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=pdf&gid=${gidSiswa}`);
 }
 </script>
 
