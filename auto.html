@@ -127,18 +127,16 @@ async function loadData(){
 
   // Ambil respons form
   let respons = await loadCSV(LINK_RESPONS_CSV);
-  const header = respons.shift(); // simpan header
-  const idxNama = header.findIndex(h => h.toLowerCase().includes("nama"));
-  const idxScore = header.findIndex(h => h.toLowerCase().includes("nilai") || h.toLowerCase().includes("score"));
+  respons.shift(); // hapus header
 
   respons.forEach(r=>{
-    let rawNama = r[idxNama]?.trim();
-    let rawScore = r[idxScore]?.trim();
+    let rawScore = r[1]?.trim(); // Kolom B = Score
+    let rawNama  = r[2]?.trim(); // Kolom C = Nama
 
     if(rawScore && rawScore.includes("/")) rawScore = rawScore.split("/")[0].trim();
 
     const score = parseInt(rawScore);
-    const nama = rawNama;
+    const nama  = rawNama;
 
     if(!nama || isNaN(score)) return;
 
