@@ -14,7 +14,7 @@
     body { font-family: Arial; padding: 20px; background: #f2f4f7; }
     .box {
         background: white; padding: 20px; border-radius: 10px; width: 750px;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.1); margin-bottom: 20px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1); margin-bottom: 25px;
     }
     h2 { margin-top: 0; }
     input[type=file], input[type=number] {
@@ -29,32 +29,31 @@
     #bar { width: 0%; height: 100%; background: #4caf50; border-radius: 6px; }
     #status { margin-top: 10px; font-weight: bold; }
 
-    #output { margin-top: 20px; }
-    table { border-collapse: collapse; width: 100%; background: white; }
-    th, td { border: 1px solid #666; padding: 6px; text-align: center; }
-    th { background: #ddd; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; background: white; }
+    th, td { border: 1px solid #999; padding: 6px; text-align: center; }
+    th { background: #0078d7; color: white; }
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
-    <img src="assets/logo.jpg" style="width:80px; height:auto; border-radius:8px;">
+<div style="display:flex; align-items:center; gap:20px; margin-bottom:20px;">
+    <img src="asset/logo.jpg" style="height:80px; border-radius:8px;">
     <div>
         <h2 style="margin:0;">Rekap Nilai Siswa</h2>
-        <small>Versi 1.0 (Build 14 November 2025) — Dev by MB</small>
+        <div>Versi 1.0 (Build 14 November 2025)</div>
+        <div>Dev by MB</div>
     </div>
 </div>
 
 <div class="box">
-    <label>📄 File Respons:</label>
+    <label>📄 File Respons (berisi nilai siswa):</label>
     <input type="file" id="fileResp" accept=".xlsx,.xls">
 
-    <label>📘 File Daftar Siswa:</label>
+    <label>📘 File Daftar Siswa (Nama Siswa):</label>
     <input type="file" id="fileSiswa" accept=".xlsx,.xls">
 
     <label>🎯 Nilai KKM:</label>
-    <input type="number" id="kkm" placeholder="contoh: 70">
+    <input type="number" id="kkm" value="78">
 
     <button onclick="proses()">⚙️ PROSES DATA</button>
 
@@ -62,7 +61,8 @@
     <p id="status">Menunggu perintah...</p>
 </div>
 
-<div id="output"></div>
+<h3>📊 Hasil Rekap</h3>
+<div id="tabelHasil"></div>
 
 <script>
 function setProgress(p) {
@@ -74,21 +74,22 @@ function readExcel(file) {
         const fr = new FileReader();
         fr.onload = (e) => {
             const data = new Uint8Array(e.target.result);
-            const wb = XLSX.read(data, {type: 'array'});
+            const wb = XLSX.read(data, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
-            resolve(XLSX.utils.sheet_to_json(ws, {defval:""}));
+            resolve(XLSX.utils.sheet_to_json(ws, { defval: "" }));
         };
         fr.readAsArrayBuffer(file);
     });
 }
 
+// Nilai tertinggi
 function nilaiAkhir(arr) {
     if (!arr || arr.length === 0) return "";
     return Math.max(...arr);
 }
 
-// pewarnaan sel
-function setCellColor(cell, color) {
+// Warna sel
+function warnaSel(cell, color) {
     cell.s = {
         fill: { patternType: "solid", fgColor: { rgb: color } }
     };
@@ -100,125 +101,106 @@ async function proses() {
     let fileSiswa = document.getElementById("fileSiswa").files[0];
     let kkm = parseFloat(document.getElementById("kkm").value);
 
-    if (!fileResp || !fileSiswa || isNaN(kkm)) {
-        alert("Lengkapi semua input!");
+    if (!fileResp || !fileSiswa) {
+        alert("File belum dipilih!");
         return;
     }
 
-    setProgress(10);
     document.getElementById("status").innerText = "📘 Membaca file...";
+    setProgress(15);
 
     let resp = await readExcel(fileResp);
     let siswa = await readExcel(fileSiswa);
 
     // Normalisasi nama
-    resp.forEach(r => r._nama = (r.NAMA || r.Nama || "").toString().toLowerCase().trim());
-    siswa.forEach(s => s._nama = (s.NAMA || s.Nama || "").toString().toLowerCase().trim());
+    resp.forEach(r => r._nama = (r.NAMA || r.Nama || r["Nama Siswa"] || "").toString().toLowerCase().trim());
+    siswa.forEach(s => s._nama = (s.NAMA || s.Nama || s["Nama Siswa"] || "").toString().toLowerCase().trim());
 
-    setProgress(20);
-    document.getElementById("status").innerText = "🔍 Menjalankan fuzzy matching...";
+    setProgress(25);
 
-    let fuse = new Fuse(resp, { keys:["_nama"], threshold:0.3 });
+    let fuse = new Fuse(resp, { keys: ["_nama"], threshold: 0.3 });
 
     let hasil = [];
-    let maxScores = 0;
     let idx = 1;
 
-    setProgress(30);
+    document.getElementById("status").innerText = "🔄 Memproses data...";
 
     for (let s of siswa) {
 
         let match = fuse.search(s._nama);
-        let scoreList = [];
 
-        if (match.length > 0) {
-            let row = match[0].item;
+        let scores = [];
+        let rowMatch = match.length > 0 ? match[0].item : {};
 
-            // ambil kolom score dinamis
-            for (let k in row) {
-                let lk = k.toLowerCase();
-                if (lk.includes("score") || lk.includes("nilai") || lk.includes("skor")) {
-                    let v = parseFloat(row[k]);
-                    if (!isNaN(v)) scoreList.push(v);
-                }
+        // Ambil nilai score otomatis
+        for (let k in rowMatch) {
+            let key = k.toLowerCase();
+            if (key.includes("score") || key.includes("nilai")) {
+                let v = parseFloat(rowMatch[k]);
+                if (!isNaN(v)) scores.push(v);
             }
         }
 
-        if (scoreList.length > maxScores) maxScores = scoreList.length;
+        let nilaiAkh = nilaiAkhir(scores);
 
-        hasil.push({
+        let obj = {
             NO: idx++,
-            NAMA: s.NAMA || s.Nama,
-            NILAI_AKHIR: nilaiAkhir(scoreList),
-            SCORES: scoreList
-        });
+            "NAMA SISWA": s.NAMA || s.Nama || s["Nama Siswa"],
+            "NILAI AKHIR": nilaiAkh
+        };
 
-        setProgress(30 + (idx / siswa.length) * 60);
+        scores.forEach((v, i) => obj["SCORE" + (i + 1)] = v);
+
+        hasil.push(obj);
+
+        setProgress(25 + (idx / siswa.length) * 60);
     }
 
-    document.getElementById("status").innerText = "📊 Membuat tabel output...";
+    document.getElementById("status").innerText = "📊 Membuat tabel...";
 
-    // ====================
-    // TABEL HTML
-    // ====================
-    let html = "<table><tr><th>NO</th><th>NAMA</th><th>NILAI AKHIR</th>";
-
-    for (let i=1; i<=maxScores; i++) html += `<th>SCORE${i}</th>`;
+    // -------------------------
+    // TAMPILKAN TABEL HTML
+    // -------------------------
+    let html = "<table><tr>";
+    Object.keys(hasil[0]).forEach(k => html += "<th>" + k + "</th>");
     html += "</tr>";
 
     hasil.forEach(r => {
-        html += `<tr>
-            <td>${r.NO}</td>
-            <td>${r.NAMA}</td>
-            <td>${r.NILAI_AKHIR}</td>
-        `;
-
-        for (let i=0; i<maxScores; i++) {
-            html += `<td>${r.SCORES[i] ?? ""}</td>`;
-        }
-
+        html += "<tr>";
+        Object.values(r).forEach(v => html += "<td>" + v + "</td>");
         html += "</tr>";
     });
 
     html += "</table>";
+    document.getElementById("tabelHasil").innerHTML = html;
 
-    document.getElementById("output").innerHTML = html;
-
-    // ====================
-    // EXCEL EXPORT
-    // ====================
+    // -------------------------
+    // BUAT FILE EXCEL
+    // -------------------------
     document.getElementById("status").innerText = "📦 Membuat Excel...";
 
-    // siapkan JSON untuk XLSX
-    let exportData = hasil.map(r => {
-        let obj = { NO: r.NO, NAMA: r.NAMA, NILAI_AKHIR: r.NILAI_AKHIR };
-        r.SCORES.forEach((v, idx) => { obj[`SCORE${idx+1}`] = v; });
-        return obj;
-    });
-
-    let ws = XLSX.utils.json_to_sheet(exportData);
-    let wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(hasil);
+    const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "HASIL");
 
-    // warnai cell
-    let range = XLSX.utils.decode_range(ws["!ref"]);
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+
     for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        let val = ws[XLSX.utils.encode_cell({ r: R, c: 2 })]?.v;
 
-        let nilai = ws[XLSX.utils.encode_cell({r:R, c:2})]?.v;
-
-        if (nilai !== "" && nilai !== undefined) {
+        if (val !== undefined && val !== "") {
             let color = "F8CBAD"; // merah
-            if (nilai > kkm) color = "C6EFCE"; // hijau
-            else if (nilai == kkm) color = "FFF2CC"; // kuning
+            if (val > kkm) color = "C6EFCE"; // hijau
+            else if (val == kkm) color = "FFF2CC"; // kuning
 
-            setCellColor(ws[XLSX.utils.encode_cell({r:R, c:2})], color);
+            warnaSel(ws[XLSX.utils.encode_cell({ r: R, c: 2 })], color);
         }
     }
 
     XLSX.writeFile(wb, "REKAP_NILAI_FINAL.xlsx");
 
     setProgress(100);
-    document.getElementById("status").innerText = "✅ Selesai! File sudah dibuat.";
+    document.getElementById("status").innerText = "✅ Selesai! File Excel berhasil dibuat.";
 }
 </script>
 
