@@ -7,7 +7,7 @@
 <style>
 body { font-family: Arial; padding:20px; background:#f4f4f4; }
 h2 { margin-bottom:10px; }
-select, input[type=number], input[type=text], button { padding:6px 10px; margin:5px; }
+select, input[type=number], button { padding:6px 10px; margin:5px; }
 table { border-collapse: collapse; width:100%; margin-top:15px; background:white; }
 th, td { border:1px solid #ccc; padding:6px; text-align:center; }
 th { background:#333; color:white; }
@@ -27,13 +27,12 @@ th { background:#333; color:white; }
 <label><b>Pilih Kelas:</b></label>
 <select id="kelasSelect"></select>
 <br>
-<label><b>Tautan Form Responses:</b></label>
-<input type="text" id="linkRespons" style="width:80%;" 
-       value="https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001">
+<label><b>Pilih Asesmen:</b></label>
+<select id="asesmenSelect"></select>
 <button onclick="loadData()">🔄 Muat Data</button>
 </div>
 
-<div id="output">Silakan pilih kelas dan muat data...</div>
+<div id="output">Silakan pilih kelas dan asesmen, lalu muat data...</div>
 
 <div id="downloadArea" style="margin-top:20px; display:none;">
 <button onclick="downloadExcel()">📥 Download Excel</button>
@@ -42,6 +41,7 @@ th { background:#333; color:white; }
 
 <script>
 // ======= KONFIGURASI =======
+// Mapping sheet siswa per kelas
 const gidPerKelas = {
   "7A": "195602539",
   "7B": "614617083",
@@ -54,6 +54,13 @@ const gidPerKelas = {
   "7I": "304301086"
 };
 
+// Mapping Asesmen → gid Form Responses
+const asesmenPerGid = {
+  "Asesmen Bab 3": "761163956",
+  "Asesmen Bab 4": "1943120001",
+  "Asesmen Bab 5": "1529993762"
+};
+
 // Populate dropdown kelas
 const kelasSelect = document.getElementById("kelasSelect");
 Object.keys(gidPerKelas).forEach(k => {
@@ -61,6 +68,15 @@ Object.keys(gidPerKelas).forEach(k => {
   option.value = k;
   option.text = k;
   kelasSelect.appendChild(option);
+});
+
+// Populate dropdown asesmen
+const asesmenSelect = document.getElementById("asesmenSelect");
+Object.keys(asesmenPerGid).forEach(a => {
+  const option = document.createElement("option");
+  option.value = asesmenPerGid[a];  // pakai gid
+  option.text = a;
+  asesmenSelect.appendChild(option);
 });
 
 // ======= Fungsi CSV =======
@@ -74,15 +90,15 @@ async function loadCSV(url){
 async function loadData(){
   const kkm = parseInt(document.getElementById("kkm").value);
   const kelasTerpilih = kelasSelect.value;
-  const LINK_RESPONS_CSV = document.getElementById("linkRespons").value.trim();
+  const gidAsesmen = asesmenSelect.value;
 
   if(!kelasTerpilih){ alert("Pilih kelas dulu!"); return; }
-  if(!LINK_RESPONS_CSV){ alert("Masukkan tautan Form Responses!"); return; }
+  if(!gidAsesmen){ alert("Pilih asesmen dulu!"); return; }
 
   document.getElementById("output").innerHTML = "Memuat data kelas "+kelasTerpilih+"…";
 
-  const gidSiswa = gidPerKelas[kelasTerpilih];
-  const LINK_SISWA_CSV = `https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=${gidSiswa}`;
+  const LINK_SISWA_CSV = `https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=${gidPerKelas[kelasTerpilih]}`;
+  const LINK_RESPONS_CSV = `https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=${gidAsesmen}`;
 
   // Ambil data siswa
   let siswa = await loadCSV(LINK_SISWA_CSV);
