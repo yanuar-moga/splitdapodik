@@ -1,178 +1,135 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Rekap Nilai Siswa</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 
 <style>
-    body {
-        font-family: Arial;
-        padding: 20px;
-        background: #f4f4f4;
-    }
-    h2 { margin-bottom: 5px; }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        background: white;
-        margin-top: 15px;
-    }
-    th, td {
-        border: 1px solid #cccccc;
-        padding: 8px;
-        text-align: center;
-    }
-    th {
-        background: #333;
-        color: white;
-    }
-    .hijau { background: #d4edda; }
-    .kuning { background: #fff3cd; }
-    .merah { background: #f8d7da; }
-    .panel {
-        background: white;
-        padding: 10px;
-        border-radius: 6px;
-        margin-bottom: 15px;
-        border: 1px solid #ddd;
-    }
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  select, button { padding: 8px 14px; margin: 6px 0; }
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  table, th, td { border: 1px solid #ccc; }
+  th { background:#f5f5f5; }
+  th, td { padding: 8px; text-align:left; }
+  #kelasMenu { margin-top: 20px; }
 </style>
-
 </head>
+
 <body>
 
 <h2>📊 Rekap Nilai Siswa</h2>
-<div class="panel">
-    <label><b>KKM:</b></label>
-    <input type="number" id="kkm" value="78" style="width:80px;">
-    <button onclick="loadData()">🔄 Muat Ulang Data</button>
+
+<div id="kelasMenu">
+  <label><b>Pilih Kelas:</b></label>
+  <select id="pilihKelas" onchange="filterKelas()">
+    <option value="ALL">Semua Kelas</option>
+  </select>
 </div>
 
-<div id="output">Memuat data...</div>
+<div id="tableDiv">Memuat data...</div>
+
+<div id="downloadArea" style="margin-top:20px; display:none;">
+  <h3>📥 Download Rekapan</h3>
+  <button onclick="downloadExcel()">Download Excel</button>
+  <button onclick="downloadPDF()">Download PDF</button>
+</div>
 
 <script>
+// === KONFIGURASI GOOGLE SHEET ===
+const sheetID = "MASUKKAN_ID_GOOGLE_SHEET_DI_SINI";  
+const sheetName = "Sheet1";  
 
-// ======================
-// 1. LINK CSV GOOGLE SHEET
-// ======================
+let globalData = null;
 
-// Daftar siswa (urutan kelas)
-const LINK_SISWA = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=195602539";
+google.charts.load('current', {'packages':['table']});
+google.charts.setOnLoadCallback(loadSheetData);
 
-// Data nilai dari Form Responses
-const LINK_NILAI = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001";
+function loadSheetData() {
+    const query = new google.visualization.Query(
+        `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?sheet=${sheetName}`
+    );
 
+    query.send(response => {
+        if (response.isError()) {
+            document.getElementById("tableDiv").innerHTML = "Gagal memuat data.";
+            return;
+        }
 
-// ======================
-// 2. Fungsi baca CSV
-// ======================
-async function loadCSV(url) {
-    const res = await fetch(url);
-    const txt = await res.text();
-    return txt.split("\n").map(r => r.split(","));
+        globalData = response.getDataTable();
+        tampilkanKelas(globalData);
+        tampilkanTabel(globalData);
+    });
 }
 
-// ======================
-// 3. Fungsi utama
-// ======================
-async function loadData() {
+function tampilkanKelas(data) {
+    const pilih = document.getElementById("pilihKelas");
+    const kelasSet = new Set();
 
-    document.getElementById("output").innerHTML = "Memuat data...";
+    // Cari kolom bernama "Kelas"
+    const colIndex = data.getNumberOfColumns();
+    let idxKelas = -1;
 
-    const kkm = parseInt(document.getElementById("kkm").value);
-
-    // --- A. Data dasar siswa ---
-    let siswa = await loadCSV(LINK_SISWA);
-    siswa.shift(); // hapus header
-
-    // Format menjadi:
-    // { nama: "Ahmad", no: "1", scoreAkhir: 0, riwayat: [] }
-    let dataSiswa = siswa.map(row => ({
-        no: row[0],
-        nama: row[1].trim(),
-        scoreAkhir: "",
-        riwayat: []
-    }));
-
-    // --- B. Ambil nilai respon form ---
-    let nilai = await loadCSV(LINK_NILAI);
-    nilai.shift(); // Hapus header
-
-    // Format Form:
-    // Timestamp | Nilai (kolom B = indeks 1) | Nama (kolom C = indeks 2)
-    nilai.forEach(row => {
-        let score = parseInt(row[1]);
-        let nama = row[2]?.trim();
-
-        if (!nama || isNaN(score)) return;
-
-        let target = dataSiswa.find(s => s.nama.toLowerCase() === nama.toLowerCase());
-        if (target) {
-            target.riwayat.push(score);
+    for (let i = 0; i < colIndex; i++) {
+        if (data.getColumnLabel(i).toLowerCase() === "kelas") {
+            idxKelas = i;
+            break;
         }
-    });
-
-    // Hitung score akhir berdasarkan kiriman terakhir
-    dataSiswa.forEach(s => {
-        if (s.riwayat.length > 0) {
-            s.scoreAkhir = s.riwayat[s.riwayat.length - 1];
-        }
-    });
-
-
-    // ======================
-    // 4. Generate tabel HTML
-    // ======================
-    let html = "<table><tr>";
-    html += "<th>No</th><th>Nama Siswa</th><th>Score Akhir</th>";
-
-    // Cari jumlah riwayat terbanyak
-    let maxRiwayat = Math.max(...dataSiswa.map(s => s.riwayat.length));
-
-    for (let i = 1; i <= maxRiwayat; i++) {
-        html += `<th>Score ${i}</th>`;
     }
 
-    html += "</tr>";
+    if (idxKelas === -1) return alert("Kolom 'Kelas' tidak ditemukan!");
 
-    // Baris data
-    dataSiswa.forEach(s => {
-        html += "<tr>";
+    for (let i = 0; i < data.getNumberOfRows(); i++) {
+        kelasSet.add(data.getValue(i, idxKelas));
+    }
 
-        html += `<td>${s.no}</td>`;
-        html += `<td>${s.nama}</td>`;
-
-        // Warna score akhir
-        let akhirClass =
-            s.scoreAkhir == "" ? "" :
-            s.scoreAkhir > kkm ? "hijau" :
-            s.scoreAkhir == kkm ? "kuning" : "merah";
-
-        html += `<td class="${akhirClass}">${s.scoreAkhir}</td>`;
-
-        // Score1, Score2, dst
-        for (let i = 0; i < maxRiwayat; i++) {
-            let nilai = s.riwayat[i] ?? "";
-
-            let cls =
-                nilai === "" ? "" :
-                nilai > kkm ? "hijau" :
-                nilai == kkm ? "kuning" : "merah";
-
-            html += `<td class="${cls}">${nilai}</td>`;
-        }
-
-        html += "</tr>";
+    [...kelasSet].sort().forEach(k => {
+        pilih.innerHTML += `<option value="${k}">${k}</option>`;
     });
-
-    html += "</table>";
-
-    document.getElementById("output").innerHTML = html;
 }
 
-loadData();
+function tampilkanTabel(data) {
+    const table = new google.visualization.Table(document.getElementById('tableDiv'));
+    table.draw(data);
 
+    document.getElementById("downloadArea").style.display = "block";
+}
+
+function filterKelas() {
+    const pilih = document.getElementById("pilihKelas").value;
+
+    if (pilih === "ALL") {
+        tampilkanTabel(globalData);
+        return;
+    }
+
+    const view = new google.visualization.DataView(globalData);
+    const colIndex = globalData.getNumberOfColumns();
+    let idxKelas = -1;
+
+    for (let i = 0; i < colIndex; i++) {
+        if (globalData.getColumnLabel(i).toLowerCase() === "kelas") {
+            idxKelas = i;
+            break;
+        }
+    }
+
+    view.setRows(
+        globalData.getFilteredRows([{column: idxKelas, value: pilih}])
+    );
+
+    tampilkanTabel(view);
+}
+
+function downloadExcel() {
+    window.open(`https://docs.google.com/spreadsheets/d/${sheetID}/export?format=xlsx`);
+}
+
+function downloadPDF() {
+    window.open(`https://docs.google.com/spreadsheets/d/${sheetID}/export?format=pdf`);
+}
 </script>
 
 </body>
