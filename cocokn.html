@@ -2,195 +2,133 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Rekap Nilai Siswa</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        padding: 20px;
-        background: #f2f2f2;
-    }
-    h1 {
-        margin-bottom: 0px;
-    }
-    .header-box {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 30px;
-    }
-    .header-box img {
-        width: 70px;
-        height: 70px;
-        border-radius: 10px;
-        border: 2px solid #ddd;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 25px;
-        background: #fff;
-    }
-    table, th, td {
-        border: 1px solid #aaa;
-    }
-    th, td {
-        padding: 8px;
-        text-align: center;
-    }
-    th {
-        background: #444;
-        color: #fff;
-    }
-    .green { background: #b6f7b6 !important; }
-    .yellow { background: #fff6a3 !important; }
-    .red { background: #ffb3b3 !important; }
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  th, td { border: 1px solid #000; padding: 6px; text-align: center; }
+  .hijau { background: #a8f0a5; }
+  .kuning { background: #fff7a1; }
+  .merah { background: #ffb1b1; }
 </style>
 </head>
 <body>
-
-<div class="header-box">
-    <img src="asset/logo.jpg" alt="Logo">
-    <div>
-        <h1>Rekap Nilai Siswa</h1>
-        <div>Versi 1.0 (Build 14 November 2025) — Dev by MB</div>
-    </div>
-</div>
-
-<label>KKM: <input type="number" id="kkm" value="78"></label>
+<h2>Rekap Nilai Siswa<br>Versi 1.0 (Build 14 November 2025) – Dev by MB</h2>
+<img src="asset/logo.jpg" alt="Logo" width="120" />
 <br><br>
-
-<h3>Upload Daftar Siswa (Kolom A=NO, B=Nama, C=Score)</h3>
-<input type="file" id="fileDaftar" accept=".xlsx, .xls">
-
-<h3>Upload Respons Nilai (B=Score, C=Nama, D=Absen, E=Kelas)</h3>
-<input type="file" id="fileRespons" accept=".xlsx, .xls">
+<label>Upload Excel Daftar Siswa:</label>
+<input type="file" id="excelDaftar" accept=".xlsx,.xls" />
+<br><br>
+<label>Upload Excel Respons Siswa:</label>
+<input type="file" id="excelRespons" accept=".xlsx,.xls" />
+<br><br>
+<label>KKM:</label>
+<input type="number" id="kkm" value="78" />
+<br><br>
+<button onclick="prosesData()">PROSES DATA</button>
 
 <div id="output"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let daftarSiswa = [];
-let responsNilai = [];
-let hasilGabung = [];
+let responsSiswa = [];
 
 function bacaExcel(file, callback) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        callback(json);
-    };
-    reader.readAsArrayBuffer(file);
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    callback(json);
+  };
+  reader.readAsArrayBuffer(file);
 }
 
-document.getElementById("fileDaftar").addEventListener("change", function() {
-    bacaExcel(this.files[0], (rows) => {
+function prosesData() {
+  const fileDaftar = document.getElementById('excelDaftar').files[0];
+  const fileRespons = document.getElementById('excelRespons').files[0];
 
-        rows = rows.slice(1); // skip header
+  if (!fileDaftar || !fileRespons) {
+    alert('Upload kedua file terlebih dahulu');
+    return;
+  }
 
-        daftarSiswa = rows
-            .filter(r => r[1]) // hanya yang punya nama
-            .map(r => ({
-                no: r[0],
-                nama: r[1].toString().trim(),
-                scores: []  // akan diisi dari respons
-            }));
+  bacaExcel(fileDaftar, ds => {
+    daftarSiswa = ds.map(r => ({
+      no: r["A"] || r["no"] || r["No"] || r["NO"],
+      nama: r["B"] || r["nama"] || r["Nama"] || r["NAMA"],
+      score1: r["C"] || ""
+    }));
 
-        alert("Daftar siswa berhasil dimuat!");
-        cobaGabung();
+    bacaExcel(fileRespons, rs => {
+      responsSiswa = rs.map(r => ({
+        nama: r["C"] || r["Nama Lengkap"] || r["nama"] || "",
+        score: r["B"] || 0
+      }));
+
+      gabungkanData();
     });
-});
-
-document.getElementById("fileRespons").addEventListener("change", function() {
-    bacaExcel(this.files[0], (rows) => {
-
-        rows = rows.slice(1); // skip header
-
-        responsNilai = rows
-            .filter(r => r[2]) // hanya baris dengan nama
-            .map(r => ({
-                score: Number(r[1]),
-                nama: r[2].toString().trim(),
-                absen: r[3],
-                kelas: r[4]
-            }));
-
-        alert("Respons nilai berhasil dimuat!");
-        cobaGabung();
-    });
-});
-
-function cobaGabung() {
-    if (daftarSiswa.length === 0 || responsNilai.length === 0) return;
-
-    let mapScore = {};
-
-    responsNilai.forEach(r => {
-        if (!mapScore[r.nama]) mapScore[r.nama] = [];
-        mapScore[r.nama].push(r.score);
-    });
-
-    hasilGabung = daftarSiswa.map(s => {
-        let scores = mapScore[s.nama] || [];
-        let nilaiAkhir = scores.length > 0 ? Math.max(...scores) : "";
-
-        return {
-            no: s.no,
-            nama: s.nama,
-            nilaiAkhir: nilaiAkhir,
-            scores: scores
-        };
-    });
-
-    tampilkanTabel();
+  });
 }
 
-function tampilkanTabel() {
-    const kkm = Number(document.getElementById("kkm").value);
-    let maxScoreCount = Math.max(...hasilGabung.map(s => s.scores.length));
+function gabungkanData() {
+  let kkm = parseInt(document.getElementById('kkm').value);
 
-    let html = "<table><tr>";
-    html += "<th>No</th><th>Nama Siswa</th><th>Nilai Akhir</th>";
+  // Buat map per nama untuk kumpulkan semua score
+  let mapScore = {};
+  responsSiswa.forEach(r => {
+    if (!mapScore[r.nama]) mapScore[r.nama] = [];
+    mapScore[r.nama].push(Number(r.score));
+  });
 
-    for (let i = 1; i <= maxScoreCount; i++) {
-        html += `<th>Score ${i}</th>`;
+  // Gabungkan ke daftar siswa
+  daftarSiswa.forEach(s => {
+    let scores = mapScore[s.nama] || [];
+    s.allScores = scores;
+    s.nilaiAkhir = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0) / scores.length).toFixed(2) : "";
+  });
+
+  tampilkanTabel();
+}
+
+function warna(nilai, kkm){
+  if (nilai === "") return "";
+  nilai = Number(nilai);
+  if (nilai > kkm) return "hijau";
+  if (nilai === kkm) return "kuning";
+  return "merah";
+}
+
+function tampilkanTabel(){
+  let kkm = parseInt(document.getElementById('kkm').value);
+  let html = `<table><tr>
+      <th>No</th><th>Nama Siswa</th><th>Nilai Akhir</th>`;
+
+  for(let i=1;i<=6;i++) html += `<th>Score${i}</th>`;
+  html += `</tr>`;
+
+  daftarSiswa.forEach(s => {
+    html += `<tr>`;
+    html += `<td>${s.no}</td>`;
+    html += `<td>${s.nama}</td>`;
+
+    // nilai akhir
+    html += `<td class="${warna(s.nilaiAkhir,kkm)}">${s.nilaiAkhir}</td>`;
+
+    // score1-6
+    for(let i=0;i<6;i++){
+      let val = s.allScores[i] || "";
+      html += `<td class="${warna(val,kkm)}">${val}</td>`;
     }
-    html += "</tr>";
 
-    hasilGabung.forEach(s => {
-        html += "<tr>";
-        html += `<td>${s.no}</td>`;
-        html += `<td>${s.nama}</td>`;
+    html += `</tr>`;
+  });
 
-        let warnaNA = s.nilaiAkhir === "" ? "" :
-                      s.nilaiAkhir > kkm ? "green" :
-                      s.nilaiAkhir == kkm ? "yellow" : "red";
-
-        html += `<td class="${warnaNA}">${s.nilaiAkhir}</td>`;
-
-        for (let i = 0; i < maxScoreCount; i++) {
-            let sc = s.scores[i] ?? "";
-            let warna = "";
-
-            if (sc !== "") {
-                warna = sc > kkm ? "green" :
-                        sc == kkm ? "yellow" : "red";
-            }
-
-            html += `<td class="${warna}">${sc}</td>`;
-        }
-
-        html += "</tr>";
-    });
-
-    html += "</table>";
-    document.getElementById("output").innerHTML = html;
+  html += `</table>`;
+  document.getElementById('output').innerHTML = html;
 }
 </script>
-
 </body>
 </html>
