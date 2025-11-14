@@ -109,9 +109,13 @@ async function loadData(){
   let respons = await loadCSV(LINK_RESPONS_CSV);
   respons.shift(); // hapus header
   respons.forEach(r=>{
-    // ambil kolom B = nilai, kolom C = nama
-    let rawScore = r[1]?.replace(/"/g,"").trim();
-    let rawNama = r[2]?.replace(/"/g,"").trim();
+    let rawScore = r[1]?.replace(/"/g,"").trim(); // kolom B = nilai
+    let rawNama = r[2]?.replace(/"/g,"").trim();  // kolom C = nama
+
+    // Ambil angka sebelum '/'
+    if(rawScore.includes("/")){
+      rawScore = rawScore.split("/")[0].trim();
+    }
 
     const score = parseInt(rawScore);
     const nama = rawNama;
