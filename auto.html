@@ -74,9 +74,8 @@ async function loadData(){
     let siswa = await loadCSV(LINK_SISWA_CSV);
     siswa.shift(); // hapus header
 
-    // Filter sesuai kelas
-    let dataSiswa = siswa.filter(r => r[2]?.trim() === kelasTerpilih) // asumsikan kolom C = kelas
-        .map(r => ({ no:r[0], nama:r[1].trim(), scoreAkhir:"", riwayat:[] }));
+    // Semua siswa dimuat, urut sesuai sheet
+    let dataSiswa = siswa.map(r => ({ no:r[0], nama:r[1].trim(), scoreAkhir:"", riwayat:[] }));
 
     // --- Ambil respons form ---
     let respons = await loadCSV(LINK_RESPONS_CSV);
@@ -98,7 +97,8 @@ async function loadData(){
     });
 
     // ======= BANGUN TABEL =======
-    let html = "<table><tr>";
+    let html = `<h3>Data Kelas: ${kelasTerpilih}</h3>`;
+    html += "<table><tr>";
     html += "<th>No</th><th>Nama Siswa</th><th>Score Akhir</th>";
     let maxRiwayat = Math.max(...dataSiswa.map(s=>s.riwayat.length));
     for(let i=1;i<=maxRiwayat;i++){ html += `<th>Score ${i}</th>`; }
