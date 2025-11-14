@@ -130,14 +130,18 @@ async function loadData(){
   respons.shift(); // hapus header
 
   respons.forEach(r=>{
-    let rawScore = r[1]?.trim(); // Kolom B = Score
-    let rawNama  = r[2]?.trim(); // Kolom C = Nama
+    // Kolom B = Score, Kolom C = Nama
+    let rawScore = r[1] ?? ""; 
+    let nama = r[2] ?? "";
 
-    if(rawScore && rawScore.includes("/")) rawScore = rawScore.split("/")[0].trim();
+    // Bersihkan tanda kutip & spasi
+    rawScore = rawScore.replace(/"/g,"").trim();
+    nama = nama.replace(/"/g,"").trim();
+
+    // Ambil angka sebelum '/'
+    if(rawScore.includes("/")) rawScore = rawScore.split("/")[0].trim();
 
     const score = parseInt(rawScore);
-    const nama  = rawNama;
-
     if(!nama || isNaN(score)) return;
 
     let target = dataSiswa.find(s => s.nama.toLowerCase() === nama.toLowerCase());
