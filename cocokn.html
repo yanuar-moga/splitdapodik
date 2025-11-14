@@ -62,10 +62,10 @@
 <label>KKM: <input type="number" id="kkm" value="78"></label>
 <br><br>
 
-<h3>Upload Daftar Siswa</h3>
+<h3>Upload Daftar Siswa (Kolom A=NO, B=Nama, C=Score)</h3>
 <input type="file" id="fileDaftar" accept=".xlsx, .xls">
 
-<h3>Upload Respons Nilai</h3>
+<h3>Upload Respons Nilai (B=Score, C=Nama, D=Absen, E=Kelas)</h3>
 <input type="file" id="fileRespons" accept=".xlsx, .xls">
 
 <div id="output"></div>
@@ -89,12 +89,17 @@ function bacaExcel(file, callback) {
 
 document.getElementById("fileDaftar").addEventListener("change", function() {
     bacaExcel(this.files[0], (rows) => {
-        daftarSiswa = rows.map(r => ({
-            no: r[0],
-            nama: r[1],
-            score1: r[2] ?? null,
-            scores: []
-        }));
+
+        rows = rows.slice(1); // skip header
+
+        daftarSiswa = rows
+            .filter(r => r[1]) // hanya yang punya nama
+            .map(r => ({
+                no: r[0],
+                nama: r[1].toString().trim(),
+                scores: []  // akan diisi dari respons
+            }));
+
         alert("Daftar siswa berhasil dimuat!");
         cobaGabung();
     });
@@ -102,12 +107,18 @@ document.getElementById("fileDaftar").addEventListener("change", function() {
 
 document.getElementById("fileRespons").addEventListener("change", function() {
     bacaExcel(this.files[0], (rows) => {
-        responsNilai = rows.map(r => ({
-            score: r[1],       // kolom B
-            nama: r[2],        // kolom C
-            absen: r[3],       // kolom D
-            kelas: r[4]        // kolom E
-        }));
+
+        rows = rows.slice(1); // skip header
+
+        responsNilai = rows
+            .filter(r => r[2]) // hanya baris dengan nama
+            .map(r => ({
+                score: Number(r[1]),
+                nama: r[2].toString().trim(),
+                absen: r[3],
+                kelas: r[4]
+            }));
+
         alert("Respons nilai berhasil dimuat!");
         cobaGabung();
     });
@@ -120,13 +131,12 @@ function cobaGabung() {
 
     responsNilai.forEach(r => {
         if (!mapScore[r.nama]) mapScore[r.nama] = [];
-        mapScore[r.nama].push(Number(r.score));
+        mapScore[r.nama].push(r.score);
     });
 
     hasilGabung = daftarSiswa.map(s => {
         let scores = mapScore[s.nama] || [];
-
-        let nilaiAkhir = scores.length > 0 ? Math.max(...scores) : 0;
+        let nilaiAkhir = scores.length > 0 ? Math.max(...scores) : "";
 
         return {
             no: s.no,
@@ -156,15 +166,21 @@ function tampilkanTabel() {
         html += `<td>${s.no}</td>`;
         html += `<td>${s.nama}</td>`;
 
-        let warnaNA = s.nilaiAkhir >= kkm ? "green" : (s.nilaiAkhir === kkm ? "yellow" : "red");
+        let warnaNA = s.nilaiAkhir === "" ? "" :
+                      s.nilaiAkhir > kkm ? "green" :
+                      s.nilaiAkhir == kkm ? "yellow" : "red";
+
         html += `<td class="${warnaNA}">${s.nilaiAkhir}</td>`;
 
         for (let i = 0; i < maxScoreCount; i++) {
             let sc = s.scores[i] ?? "";
             let warna = "";
+
             if (sc !== "") {
-                warna = sc >= kkm ? "green" : (sc == kkm ? "yellow" : "red");
+                warna = sc > kkm ? "green" :
+                        sc == kkm ? "yellow" : "red";
             }
+
             html += `<td class="${warna}">${sc}</td>`;
         }
 
