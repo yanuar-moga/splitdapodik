@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Rekap Nilai Siswa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+    body {
+        font-family: Arial;
+        padding: 20px;
+        background: #f4f4f4;
+    }
+    h2 { margin-bottom: 5px; }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        background: white;
+        margin-top: 15px;
+    }
+    th, td {
+        border: 1px solid #cccccc;
+        padding: 8px;
+        text-align: center;
+    }
+    th {
+        background: #333;
+        color: white;
+    }
+    .hijau { background: #d4edda; }
+    .kuning { background: #fff3cd; }
+    .merah { background: #f8d7da; }
+    .panel {
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+    }
+</style>
+
+</head>
+<body>
+
+<h2>📊 Rekap Nilai Siswa</h2>
+<div class="panel">
+    <label><b>KKM:</b></label>
+    <input type="number" id="kkm" value="78" style="width:80px;">
+    <button onclick="loadData()">🔄 Muat Ulang Data</button>
+</div>
+
+<div id="output">Memuat data...</div>
+
+<script>
+
+// ======================
+// 1. LINK CSV GOOGLE SHEET
+// ======================
+
+// Daftar siswa (urutan kelas)
+const LINK_SISWA = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=195602539";
+
+// Data nilai dari Form Responses
+const LINK_NILAI = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001";
+
+
+// ======================
+// 2. Fungsi baca CSV
+// ======================
+async function loadCSV(url) {
+    const res = await fetch(url);
+    const txt = await res.text();
+    return txt.split("\n").map(r => r.split(","));
+}
+
+// ======================
+// 3. Fungsi utama
+// ======================
+async function loadData() {
+
+    document.getElementById("output").innerHTML = "Memuat data...";
+
+    const kkm = parseInt(document.getElementById("kkm").value);
+
+    // --- A. Data dasar siswa ---
+    let siswa = await loadCSV(LINK_SISWA);
+    siswa.shift(); // hapus header
+
+    // Format menjadi:
+    // { nama: "Ahmad", no: "1", scoreAkhir: 0, riwayat: [] }
+    let dataSiswa = siswa.map(row => ({
+        no: row[0],
+        nama: row[1].trim(),
+        scoreAkhir: "",
+        riwayat: []
+    }));
+
+    // --- B. Ambil nilai respon form ---
+    let nilai = await loadCSV(LINK_NILAI);
+    nilai.shift(); // Hapus header
+
+    // Format Form:
+    // Timestamp | Nilai (kolom B = indeks 1) | Nama (kolom C = indeks 2)
+    nilai.forEach(row => {
+        let score = parseInt(row[1]);
+        let nama = row[2]?.trim();
+
+        if (!nama || isNaN(score)) return;
+
+        let target = dataSiswa.find(s => s.nama.toLowerCase() === nama.toLowerCase());
+        if (target) {
+            target.riwayat.push(score);
+        }
+    });
+
+    // Hitung score akhir berdasarkan kiriman terakhir
+    dataSiswa.forEach(s => {
+        if (s.riwayat.length > 0) {
+            s.scoreAkhir = s.riwayat[s.riwayat.length - 1];
+        }
+    });
+
+
+    // ======================
+    // 4. Generate tabel HTML
+    // ======================
+    let html = "<table><tr>";
+    html += "<th>No</th><th>Nama Siswa</th><th>Score Akhir</th>";
+
+    // Cari jumlah riwayat terbanyak
+    let maxRiwayat = Math.max(...dataSiswa.map(s => s.riwayat.length));
+
+    for (let i = 1; i <= maxRiwayat; i++) {
+        html += `<th>Score ${i}</th>`;
+    }
+
+    html += "</tr>";
+
+    // Baris data
+    dataSiswa.forEach(s => {
+        html += "<tr>";
+
+        html += `<td>${s.no}</td>`;
+        html += `<td>${s.nama}</td>`;
+
+        // Warna score akhir
+        let akhirClass =
+            s.scoreAkhir == "" ? "" :
+            s.scoreAkhir > kkm ? "hijau" :
+            s.scoreAkhir == kkm ? "kuning" : "merah";
+
+        html += `<td class="${akhirClass}">${s.scoreAkhir}</td>`;
+
+        // Score1, Score2, dst
+        for (let i = 0; i < maxRiwayat; i++) {
+            let nilai = s.riwayat[i] ?? "";
+
+            let cls =
+                nilai === "" ? "" :
+                nilai > kkm ? "hijau" :
+                nilai == kkm ? "kuning" : "merah";
+
+            html += `<td class="${cls}">${nilai}</td>`;
+        }
+
+        html += "</tr>";
+    });
+
+    html += "</table>";
+
+    document.getElementById("output").innerHTML = html;
+}
+
+loadData();
+
+</script>
+
+</body>
+</html>
