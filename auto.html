@@ -109,8 +109,13 @@ async function loadData(){
   let respons = await loadCSV(LINK_RESPONS_CSV);
   respons.shift(); // hapus header
   respons.forEach(r=>{
-    const score = parseInt(r[1]);  // kolom B = nilai
-    const nama = r[2]?.trim();     // kolom C = nama
+    // ambil kolom B = nilai, kolom C = nama
+    let rawScore = r[1]?.replace(/"/g,"").trim();
+    let rawNama = r[2]?.replace(/"/g,"").trim();
+
+    const score = parseInt(rawScore);
+    const nama = rawNama;
+
     if(!nama || isNaN(score)) return;
 
     let target = dataSiswa.find(s => s.nama.toLowerCase() === nama.toLowerCase());
