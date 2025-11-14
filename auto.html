@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Rekap Nilai Siswa</title>
-
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 
 <style>
@@ -14,7 +13,6 @@
   table, th, td { border: 1px solid #ccc; }
   th { background:#f5f5f5; }
   th, td { padding: 8px; text-align:left; }
-  #kelasMenu { margin-top: 20px; }
 </style>
 </head>
 
@@ -22,14 +20,19 @@
 
 <h2>📊 Rekap Nilai Siswa</h2>
 
-<div id="kelasMenu">
-  <label><b>Pilih Kelas:</b></label>
-  <select id="pilihKelas" onchange="filterKelas()">
-    <option value="ALL">Semua Kelas</option>
-  </select>
-</div>
+<!-- JSON Kelas (static - sangat cepat) -->
+<script>
+const daftarKelas = [
+  "7A","7B","7C","7D","7E","7F","7G","7H","7I",
+  "8A","8B","8C","8D","8E","8F","8G","8H","8I",
+  "9A","9B","9C","9D","9E","9F","9G","9H","9I"
+];
+</script>
 
-<div id="tableDiv">Memuat data...</div>
+<label><b>Pilih Kelas:</b></label>
+<select id="pilihKelas"></select>
+
+<div id="tableDiv" style="margin-top:20px;">Silakan pilih kelas…</div>
 
 <div id="downloadArea" style="margin-top:20px; display:none;">
   <h3>📥 Download Rekapan</h3>
@@ -42,14 +45,30 @@
 const sheetID = "MASUKKAN_ID_GOOGLE_SHEET_DI_SINI";  
 const sheetName = "Sheet1";  
 
-let globalData = null;
-
 google.charts.load('current', {'packages':['table']});
-google.charts.setOnLoadCallback(loadSheetData);
+google.charts.setOnLoadCallback(initKelas);
 
-function loadSheetData() {
+function initKelas() {
+    const select = document.getElementById("pilihKelas");
+    select.innerHTML = `<option value="">-- pilih kelas --</option>`;
+
+    daftarKelas.forEach(k => {
+        select.innerHTML += `<option value="${k}">${k}</option>`;
+    });
+
+    select.onchange = () => {
+        const kelas = select.value;
+        if (kelas) loadKelas(kelas);
+    };
+}
+
+function loadKelas(kelas) {
+    document.getElementById("tableDiv").innerHTML = "Memuat data kelas " + kelas + "...";
+
     const query = new google.visualization.Query(
-        `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?sheet=${sheetName}`
+        `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?sheet=${sheetName}
+        &tq=${encodeURIComponent("select * where B = '" + kelas + "'")}`
+        // catatan: kolom B = Kelas (ubah jika bukan B)
     );
 
     query.send(response => {
@@ -58,69 +77,18 @@ function loadSheetData() {
             return;
         }
 
-        globalData = response.getDataTable();
-        tampilkanKelas(globalData);
-        tampilkanTabel(globalData);
-    });
-}
-
-function tampilkanKelas(data) {
-    const pilih = document.getElementById("pilihKelas");
-    const kelasSet = new Set();
-
-    // Cari kolom bernama "Kelas"
-    const colIndex = data.getNumberOfColumns();
-    let idxKelas = -1;
-
-    for (let i = 0; i < colIndex; i++) {
-        if (data.getColumnLabel(i).toLowerCase() === "kelas") {
-            idxKelas = i;
-            break;
+        const data = response.getDataTable();
+        if (data.getNumberOfRows() === 0) {
+            document.getElementById("tableDiv").innerHTML = "Tidak ada data kelas " + kelas;
+            return;
         }
-    }
 
-    if (idxKelas === -1) return alert("Kolom 'Kelas' tidak ditemukan!");
+        const table = new google.visualization.Table(document.getElementById('tableDiv'));
+        table.draw(data);
 
-    for (let i = 0; i < data.getNumberOfRows(); i++) {
-        kelasSet.add(data.getValue(i, idxKelas));
-    }
-
-    [...kelasSet].sort().forEach(k => {
-        pilih.innerHTML += `<option value="${k}">${k}</option>`;
+        // tampilkan tombol download
+        document.getElementById("downloadArea").style.display = "block";
     });
-}
-
-function tampilkanTabel(data) {
-    const table = new google.visualization.Table(document.getElementById('tableDiv'));
-    table.draw(data);
-
-    document.getElementById("downloadArea").style.display = "block";
-}
-
-function filterKelas() {
-    const pilih = document.getElementById("pilihKelas").value;
-
-    if (pilih === "ALL") {
-        tampilkanTabel(globalData);
-        return;
-    }
-
-    const view = new google.visualization.DataView(globalData);
-    const colIndex = globalData.getNumberOfColumns();
-    let idxKelas = -1;
-
-    for (let i = 0; i < colIndex; i++) {
-        if (globalData.getColumnLabel(i).toLowerCase() === "kelas") {
-            idxKelas = i;
-            break;
-        }
-    }
-
-    view.setRows(
-        globalData.getFilteredRows([{column: idxKelas, value: pilih}])
-    );
-
-    tampilkanTabel(view);
 }
 
 function downloadExcel() {
