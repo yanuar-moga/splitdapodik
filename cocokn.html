@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Rekap Nilai Siswa - Versi Lengkap</title>
+
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Fuse.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+
+<style>
+    body { font-family: Arial; padding: 20px; background: #f2f4f7; }
+    .box {
+        background: white; padding: 20px; border-radius: 10px; width: 650px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    h2 { margin-top: 0; }
+    input[type=file], input[type=number] {
+        width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #aaa;
+    }
+    button {
+        padding: 12px 20px; background: #0078d7; color: white; border: none;
+        border-radius: 6px; cursor: pointer; width: 100%; font-size: 15px;
+    }
+    button:hover { background: #005fa3; }
+    #progress { width: 100%; height: 22px; background: #e0e0e0; border-radius: 6px; margin-top: 12px; }
+    #bar { width: 0%; height: 100%; background: #4caf50; border-radius: 6px; }
+    #status { margin-top: 10px; font-weight: bold; }
+
+    /* Tabel hasil */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 25px;
+        background: white;
+    }
+    th, td {
+        padding: 8px;
+        border: 1px solid #888;
+        text-align: center;
+    }
+    th { background: #e9ecef; }
+</style>
+</head>
+<body>
+
+<h2>Rekap Nilai Siswa (Versi Lengkap HTML)</h2>
+
+<div class="box">
+    <label>📄 File Respons:</label>
+    <input type="file" id="fileResp" accept=".xlsx,.xls">
+
+    <label>📘 File Daftar Siswa:</label>
+    <input type="file" id="fileSiswa" accept=".xlsx,.xls">
+
+    <label>🎯 Nilai KKM:</label>
+    <input type="number" id="kkm" placeholder="contoh: 70">
+
+    <button onclick="proses()"⚙️ PROSES DATA</button>
+
+    <div id="progress"><div id="bar"></div></div>
+    <p id="status">Menunggu perintah...</p>
+</div>
+
+<h3>📊 Hasil Akhir</h3>
+<div id="outputTable"></div>
+
+<script>
+function setProgress(p) {
+    document.getElementById("bar").style.width = p + "%";
+}
+
+function readExcel(file) {
+    return new Promise((resolve) => {
+        const fr = new FileReader();
+        fr.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type: 'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            resolve(XLSX.utils.sheet_to_json(ws, {defval:""}));
+        };
+        fr.readAsArrayBuffer(file);
+    });
+}
+
+// Score akhir = nilai tertinggi
+function nilaiAkhir(scores) {
+    if (!scores || scores.length === 0) return "";
+    return Math.max(...scores);
+}
+
+function warnaSel(cell, color) {
+    cell.s = {
+        fill: {
+            patternType: "solid",
+            fgColor: { rgb: color }
+        }
+    };
+}
+
+async function proses() {
+
+    let fileResp = document.getElementById("fileResp").files[0];
+    let fileSiswa = document.getElementById("fileSiswa").files[0];
+    let kkm = parseFloat(document.getElementById("kkm").value);
+
+    if (!fileResp || !fileSiswa || isNaN(kkm)) {
+        alert("Lengkapi semua input!");
+        return;
+    }
+
+    document.getElementById("status").innerText = "📘 Membaca file...";
+    setProgress(10);
+
+    let resp = await readExcel(fileResp);
+    let siswa = await readExcel(fileSiswa);
+
+    // Normalisasi nama
+    resp.forEach(r => r._nama = (r.NAMA || r.Nama || "").toString().toLowerCase().trim());
+    siswa.forEach(s => s._nama = (s.NAMA || s.Nama || "").toString().toLowerCase().trim());
+
+    setProgress(20);
+    document.getElementById("status").innerText = "🔍 Mempersiapkan fuzzy matching...";
+
+    let fuse = new Fuse(resp, { keys: ["_nama"], threshold: 0.3 });
+
+    let hasil = [];
+    let idx = 1;
+
+    document.getElementById("status").innerText = "🔄 Memproses data...";
+
+    for (let s of siswa) {
+        let match = fuse.search(s._nama);
+
+        let scores = [];
+
+        if (match.length > 0) {
+            let row = match[0].item;
+
+            for (let k in row) {
+                let key = k.toLowerCase();
+                if (key.includes("score") || key.includes("nilai") || key.includes("skor")) {
+                    let v = parseFloat(row[k]);
+                    if (!isNaN(v)) scores.push(v);
+                }
+            }
+        }
+
+        hasil.push({
+            NO: idx++,
+            NAMA: s.NAMA || s.Nama,
+            SCORE_AKHIR: nilaiAkhir(scores),
+            ...Object.fromEntries(scores.map((v,i)=>[`SCORE${i+1}`, v]))
+        });
+
+        setProgress(20 + (idx / siswa.length) * 70);
+    }
+
+    // ----------------------
+    // TAMPILKAN TABEL HASIL
+    // ----------------------
+    buatTabelHasil(hasil);
+
+    document.getElementById("status").innerText = "📦 Membuat Excel hasil...";
+
+    const ws = XLSX.utils.json_to_sheet(hasil);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "HASIL");
+
+    // Warnai kolom SCORE_AKHIR
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        let val = ws[XLSX.utils.encode_cell({r:R, c:2})]?.v; // kolom C
+
+        if (val !== undefined && val !== "") {
+            let color = "F8CBAD"; 
+            if (val > kkm) color = "C6EFCE";
+            else if (val == kkm) color = "FFF2CC";
+
+            warnaSel(ws[XLSX.utils.encode_cell({r:R, c:2})], color);
+        }
+    }
+
+    XLSX.writeFile(wb, "REKAP_NILAI_FINAL.xlsx");
+
+    setProgress(100);
+    document.getElementById("status").innerText = "✅ Selesai! File berhasil dibuat.";
+}
+
+function buatTabelHasil(data) {
+    let html = `<table><tr>`;
+
+    // Header otomatis
+    Object.keys(data[0]).forEach(k => {
+        html += `<th>${k}</th>`;
+    });
+
+    html += `</tr>`;
+
+    // Isi tabel
+    data.forEach(row => {
+        html += `<tr>`;
+        Object.values(row).forEach(v => {
+            html += `<td>${v}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `</table>`;
+
+    document.getElementById("outputTable").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
