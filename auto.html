@@ -127,12 +127,14 @@ async function loadData(){
 
   // Ambil respons form
   let respons = await loadCSV(LINK_RESPONS_CSV);
-  respons.shift(); // hapus header
-  respons.forEach(r=>{
-    let rawScore = r[1]?.trim(); // kolom B = nilai
-    let rawNama = r[2]?.trim();  // kolom C = nama
+  const header = respons.shift(); // simpan header
+  const idxNama = header.findIndex(h => h.toLowerCase().includes("nama"));
+  const idxScore = header.findIndex(h => h.toLowerCase().includes("nilai") || h.toLowerCase().includes("score"));
 
-    // Ambil angka sebelum '/'
+  respons.forEach(r=>{
+    let rawNama = r[idxNama]?.trim();
+    let rawScore = r[idxScore]?.trim();
+
     if(rawScore && rawScore.includes("/")) rawScore = rawScore.split("/")[0].trim();
 
     const score = parseInt(rawScore);
