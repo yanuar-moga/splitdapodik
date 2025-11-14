@@ -50,6 +50,7 @@ const gidPerKelas = {
   "7I": "304301086"
 };
 
+// Link Form Responses (nilai)
 const LINK_RESPONS_CSV = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001";
 
 // Populate dropdown kelas
@@ -81,18 +82,29 @@ async function loadData(){
 
   // Ambil data siswa
   let siswa = await loadCSV(LINK_SISWA_CSV);
-  siswa.shift(); // hapus header
+  const headerSiswa = siswa.shift(); // hapus header
   let dataSiswa = siswa.map(r => ({ no:r[0], nama:r[1].trim(), scoreAkhir:"", riwayat:[] }));
 
   // Ambil respons form
   let respons = await loadCSV(LINK_RESPONS_CSV);
-  respons.shift(); // hapus header
+  const headerResp = respons.shift(); // hapus header
+
+  // Cari indeks kolom Nama & Nilai
+  const idxNama = headerResp.findIndex(h => /nama/i.test(h));
+  const idxNilai = headerResp.findIndex(h => /nilai/i.test(h));
+
+  if(idxNama < 0 || idxNilai < 0){
+    alert("Kolom Nama atau Nilai tidak ditemukan di Form Responses!");
+    return;
+  }
+
+  // Cocokkan respons ke siswa
   respons.forEach(r=>{
-    const score = parseInt(r[1]);
-    const nama = r[2]?.trim();
+    const nama = r[idxNama]?.trim();
+    const score = parseInt(r[idxNilai]);
     if(!nama || isNaN(score)) return;
 
-    let target = dataSiswa.find(s=>s.nama.toLowerCase()===nama.toLowerCase());
+    let target = dataSiswa.find(s => s.nama.toLowerCase() === nama.toLowerCase());
     if(target) target.riwayat.push(score);
   });
 
