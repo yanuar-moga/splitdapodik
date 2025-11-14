@@ -38,18 +38,21 @@ th { background:#333; color:white; }
 
 <script>
 // ======= KONFIGURASI =======
-// Mapping nama sheet → gid sheet masing-masing
 const gidPerKelas = {
   "7A": "195602539",
-  "7B": "234567890",
-  "7C": "345678901",
-  // Tambahkan sheet lain sesuai kebutuhan
+  "7B": "614617083",
+  "7C": "1707869176",
+  "7D": "865615390",
+  "7E": "1458266317",
+  "7F": "439382566",
+  "7G": "936746401",
+  "7H": "135762184",
+  "7I": "304301086"
 };
 
-// Link form respons (nilai)
 const LINK_RESPONS_CSV = "https://docs.google.com/spreadsheets/d/1MBi121FQdTBVn3ovjnGPTFg0EplEGlHD/export?format=csv&gid=1943120001";
 
-// ======= Populate dropdown kelas =======
+// Populate dropdown kelas
 const kelasSelect = document.getElementById("kelasSelect");
 Object.keys(gidPerKelas).forEach(k => {
   const option = document.createElement("option");
